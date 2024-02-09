@@ -14,6 +14,17 @@
 ################################################################################
 
 ################################################################################
+# TO DO LIST
+# 01. Review the entire exercise with EDA (not yet done)
+# Source: David Langer on YouTube
+# 02. Add more features (Titles, Decks, Fare $, Family Size, ...) and combinations 
+# 03. Improve the randomforest with cross validation (and 70/30)
+################################################################################
+
+
+
+
+################################################################################
 # Clean the environment and Load Libraries
 rm (list = ls())
 # install.packages('randomForest')
@@ -29,11 +40,6 @@ tail (titanic_train) # always check the good read.csv execution
 titanic_test <- read.csv (file ="Data/test.csv", stringsAsFactors = FALSE, header = TRUE) # keep strings as strings
 str (titanic_train) 
 str (titanic_test) # no Survived info
-
-# AGE
-median(titanic_train$Age, na.rm = TRUE) #28 - na.rm to remove missing values
-median(titanic_test$Age, na.rm = TRUE) #27 - na.rm to remove missing values
-
 
 # we will combine the two datasets to clean them together, in order to keep track which entry is which (training or test set) we add a column to store if a row was originally coming from the training or the test set
 titanic_train$IsTrainingSet <- TRUE
@@ -53,8 +59,7 @@ nrow(titanic_train) # 891
 nrow(titanic_test) # 418
 
 titanic_full <- rbind (titanic_train, titanic_test) # SQL union - a vertical Join of the two data sets
-nrow(titanic_full) # 1309 
-891 + 418 - 1309 # 0 so the math checks out
+nrow(titanic_full) # 1309 --- 891 + 418 - 1309 # 0 so the math checks out
 
 table (titanic_full$IsTrainingSet) # let's check if the combination went well
 
@@ -86,7 +91,7 @@ nrow(titanic_full[is.na(titanic_full$Age),]) # 263 indeed
 # there are two types of lm: the online gradient descent variant (not covered) and the least squares linear regression model (which is affected by outliers)
 # before we aplly this we have to filter out the 
 
-boxplot (titanic_full$Age) # see that Fare is affected by many outliers, R stores these values in "$stats vector
+boxplot (titanic_full$Age) # see that Age is affected by many outliers, R stores these values in "$stats vector
 boxplot.stats(titanic_full$Age)
 boxplot.stats(titanic_full$Age)$stats [1] # the first whisker
 boxplot.stats(titanic_full$Age)$stats [2] # the first quartile
@@ -96,7 +101,9 @@ boxplot.stats(titanic_full$Age)$stats [5] # the last whisker - anything above 66
 
 # so we filter out these items in a dynamical way
 upper.whisker <- boxplot.stats(titanic_full$Age)$stats[5]
-outlier.filter <- titanic_full$Age <= upper.whisker
+outlier.filter <- titanic_full$Age <= upper.whisker # this will work as an index
+
+
 
 titanic_full[outlier.filter,] # current filter of the non outliers Fare entries
 
@@ -162,6 +169,10 @@ fare.prediction <- predict (fare.model, newdata = fare.row)
 titanic_full[is.na(titanic_full$Fare), "Fare"] <- fare.prediction # let's substitute the missing Fare value with the predicted value
 titanic_full[1044,] # check
 
+################################################################################
+# ADDING NEW FEATURES
+
+
 
 
 
@@ -195,20 +206,22 @@ str (titanic_test)
 survive_formula <- as.formula("Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked") 
 
 # random forest prediction on titanic_train based on the survive_formula
-# we are skipping for now 70/30 split
-# we are skipping cross validation
-# we used just the median to predict the missing value of Age, Fare, Embarked
+# (-) we are skipping for now 70/30 split
+# (-) we are skipping cross validation
+# (+) we no longer used the median to predict the missing value of Age, Fare, Embarked, BUT actually fitted an lm model
 # ntree - 500 (defeult)
-# mtry - sqrt (7)
+# mtry - sqrt (7) 7 is the number of predictors
 # node size - minimum sample per node 1% of the size of the training set
-titanic_model <- randomForest (formula = survive_formula, data = titanic_train, ntree = 500, mtry = 3, nodesize = 0.01 * nrow (titanic_test))
+titanic_model <- randomForest (formula = survive_formula, data = titanic_train, ntree = 5000, mtry = 3, nodesize = 0.1 * nrow (titanic_test))
 
 # so now lets predict
-features_equiation <- "Pclass + Sex + Age + SibSp + Parch + Fare + Embarked"
-Survived <- predict(titanic_model, newdata = titanic_test) # Survived is the name of the colunm 
+features_equation <- "Pclass + Sex + Age + SibSp + Parch + Fare + Embarked"
+Survived <- predict(titanic_model, newdata = titanic_test) # Survived is the name of the column and it contains the result of the prediction
 
+# let's create the data.frame to store the two colums, the PassengerId and the Survived (0/1) result
 PassengerId <- titanic_test$PassengerId
 output.df <- as.data.frame(PassengerId)
 output.df$Survived <- Survived
 
-write.csv (output.df, "Data/Kaggle_Submission.csv", row.names = FALSE)
+# Saving the results into csv file to be updated in Kaggle - remeber to version it
+write.csv (output.df, "Data/Kaggle_Submission_V4.csv", row.names = FALSE)
