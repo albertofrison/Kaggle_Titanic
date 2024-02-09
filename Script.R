@@ -2,6 +2,7 @@
 # KAGGLE COMPETITION
 # Titanic - Machine Learning from Disaster
 # Competition URL: https://www.kaggle.com/competitions/titanic
+# Source video from Data Science Dojo - www.youtube.com/@Datasciencedojo
 # Made with ♥︎ by Alberto Frison
 # Created on February 2023
 ################################################################################
@@ -29,8 +30,10 @@ titanic_test <- read.csv (file ="Data/test.csv", stringsAsFactors = FALSE, heade
 str (titanic_train) 
 str (titanic_test) # no Survived info
 
+# AGE
 median(titanic_train$Age, na.rm = TRUE) #28 - na.rm to remove missing values
 median(titanic_test$Age, na.rm = TRUE) #27 - na.rm to remove missing values
+
 
 # we will combine the two datasets to clean them together, in order to keep track which entry is which (training or test set) we add a column to store if a row was originally coming from the training or the test set
 titanic_train$IsTrainingSet <- TRUE
@@ -67,17 +70,102 @@ table (titanic_full$Embarked) # we have no boarding port for two people... so we
 titanic_full[titanic_full$Embarked == '', "Embarked"] <-'S' # replace with the MODE the two missing values
 table (titanic_full$Embarked) # check that the replacement was ok
 
-# AGE
-table(is.na(titanic_full$Age)) # we substitute for now the missing value of Age with the median
-titanic_full[is.na(titanic_full$Age), "Age"] <- median(titanic_full$Age, na.rm =TRUE) 
-table(is.na(titanic_full$Age)) # now all passengers have an age
-
-# FARE
-table(is.na(titanic_full$Fare)) # one passenger has no Fare value
-titanic_full[is.na(titanic_full$Fare), "Fare"] <- median(titanic_full$Fare, na.rm =TRUE) 
-table(is.na(titanic_full$Fare))
 
 
+
+################################################################################
+# AGE - basic option 
+# table(is.na(titanic_full$Age)) # we substitute for now the missing value of Age with the median
+# titanic_full[is.na(titanic_full$Age), "Age"] <- median(titanic_full$Age, na.rm =TRUE) 
+# table(is.na(titanic_full$Age)) # now all passengers have an age
+
+# AGE - Advanced Option, we fit a lm model to predict missing Fare values 
+titanic_full[is.na(titanic_full$Age), "Age"] # 263 missing values in Age in the set
+nrow(titanic_full[is.na(titanic_full$Age),]) # 263 indeed
+
+# there are two types of lm: the online gradient descent variant (not covered) and the least squares linear regression model (which is affected by outliers)
+# before we aplly this we have to filter out the 
+
+boxplot (titanic_full$Age) # see that Fare is affected by many outliers, R stores these values in "$stats vector
+boxplot.stats(titanic_full$Age)
+boxplot.stats(titanic_full$Age)$stats [1] # the first whisker
+boxplot.stats(titanic_full$Age)$stats [2] # the first quartile
+boxplot.stats(titanic_full$Age)$stats [3] # the median
+boxplot.stats(titanic_full$Age)$stats [4] # the third quartile
+boxplot.stats(titanic_full$Age)$stats [5] # the last whisker - anything above 66$ is an outlier to us
+
+# so we filter out these items in a dynamical way
+upper.whisker <- boxplot.stats(titanic_full$Age)$stats[5]
+outlier.filter <- titanic_full$Age <= upper.whisker
+
+titanic_full[outlier.filter,] # current filter of the non outliers Fare entries
+
+# creation of the lm model
+str(titanic_full)
+age.equation = "Age ~ Pclass + Sex + Fare + SibSp + Parch + Embarked" # we do not use Survive, as our test data will not have it...
+
+age.model <- lm (
+  formula = age.equation,
+  data = titanic_full[outlier.filter,]
+)
+
+
+# Prediction section, but not every column is needed to predict.
+age.row <- titanic_full[is.na(titanic_full$Age),c("Pclass", "Sex", "Fare", "SibSp", "Parch", "Embarked")] # query all the rows that have no Fares and give me just the columns I need
+age.prediction <- predict (age.model, newdata = age.row)
+
+titanic_full[is.na(titanic_full$Age), "Age"] <- age.prediction # let's substitute the missing Fare value with the predicted value
+titanic_full$Age # check
+
+
+
+
+
+
+################################################################################
+# FARE - Basic Option, substitute the missing values of Fare with the median
+# table(is.na(titanic_full$Fare)) # one passenger has no Fare value
+# titanic_full[is.na(titanic_full$Fare), "Fare"] <- median(titanic_full$Fare, na.rm =TRUE) 
+# table(is.na(titanic_full$Fare))
+
+# FARE - Advanced Option, we fit a lm model to predict missing Fare values 
+titanic_full[is.na(titanic_full$Fare), "Fare"] # just one missing Fare in the entire dataset
+
+boxplot (titanic_full$Fare) # see that Fare is affected by many outliers, R stores these values in "$stats vector
+boxplot.stats(titanic_full$Fare)
+boxplot.stats(titanic_full$Fare)$stats [1] # the first whisker
+boxplot.stats(titanic_full$Fare)$stats [2] # the first quartile
+boxplot.stats(titanic_full$Fare)$stats [3] # the median
+boxplot.stats(titanic_full$Fare)$stats [4] # the third quartile
+boxplot.stats(titanic_full$Fare)$stats [5] # the last whisker - anything above 65$ is an outlier to us
+
+# so we filter out these items in a dynamical way
+upper.whisker <- boxplot.stats(titanic_full$Fare)$stats[5]
+outlier.filter <- titanic_full$Fare <= upper.whisker
+
+titanic_full[outlier.filter,] # current filter of the non outliers Fare entries
+
+# creation of the lm model
+str(titanic_full)
+fare.equation = "Fare ~ Pclass + Sex + Age + SibSp + Parch + Embarked" # we do not use Survive, as our test data will not have it...
+
+fare.model <- lm (
+  formula = fare.equation,
+  data = titanic_full[outlier.filter,]
+)
+
+
+# Prediction section, but not every column is needed to predict.
+fare.row <- titanic_full[is.na(titanic_full$Fare),c("Pclass", "Sex", "Age", "SibSp", "Parch", "Embarked")] # query all the rows that have no Fares and give me just the columns I need
+fare.prediction <- predict (fare.model, newdata = fare.row)
+
+titanic_full[is.na(titanic_full$Fare), "Fare"] <- fare.prediction # let's substitute the missing Fare value with the predicted value
+titanic_full[1044,] # check
+
+
+
+
+################################################################################
 # CAST STRINGS INTO CATEGORIES
 titanic_full$Pclass <- as.factor(titanic_full$Pclass) 
 titanic_full$Sex <- as.factor(titanic_full$Sex) 
