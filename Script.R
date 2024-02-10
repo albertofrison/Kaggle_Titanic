@@ -25,12 +25,14 @@
 
 
 ################################################################################
-# Clean the environment and Load Libraries
-rm (list = ls())
 # install.packages('randomForest')
 # install.packages ('tidyverse')
 library (tidyverse)
 library(randomForest)
+
+# Clean the environment and Load Libraries
+rm (list = ls())
+
 
 
 ################################################################################
@@ -45,6 +47,7 @@ str (titanic_train)
 str (titanic_test) # no Survived info
 
 
+################################################################################
 ################################################################################
 # EDA Section
 
@@ -151,6 +154,8 @@ titanic_train %>%
   labs (fill = "Survived")
 
 
+
+################################################################################
 ################################################################################
 # Function to extract Titles from Names
 
@@ -165,16 +170,28 @@ extract_Title <- function (name) {
     return ("Mrs.")
   } else if (length (grep ("Miss.", name)) > 0 ) {
       return ("Miss.")
+  } else if (length (grep ("Mlle.", name)) > 0 ) {
+    return ("Miss.")
   } else if (length (grep ("Mme.", name)) > 0 ) {
     return ("Mrs.")
   } else if (length (grep ("Ms.", name)) > 0 ) {
     return ("Mrs.")
+  } else if (length (grep ("Mr.", name)) > 0 ) {
+    return ("Mr.")
   } else if (length (grep ("Dr.", name)) > 0 ) {
     return ("Dr.")
   } else if (length (grep ("Rev.", name)) > 0 ) {
     return ("Priest.")
   } else if (length (grep ("Don.", name)) > 0 ) {
     return ("Priest.")
+  } else if (length (grep ("Dona.", name)) > 0 ) {
+    return ("Mrs.")
+  }  else if (length (grep ("Col.", name)) > 0 ) {
+    return ("Military.")
+  } else if (length (grep ("Capt.", name)) > 0 ) {
+    return ("Military.")
+  } else if (length (grep ("Major.", name)) > 0 ) {
+    return ("Military.")
   } else return ("Other.")
   
 }
@@ -204,12 +221,32 @@ nrow(titanic_full) # 1309 --- 891 + 418 - 1309 # 0 so the math checks out
 
 table (titanic_full$IsTrainingSet) # let's check if the combination went well
 
+
+################################################################################
+################################################################################
+# ADDING NEW FEATURES
+
+# TITLES
+titles <- NULL
+for (i in 1:nrow (titanic_full)) {
+  titles <- c (titles, extract_Title(titanic_full[i,"Name"])) 
+}
+titanic_full$Title <- as.factor (titles) 
+tail(titanic_full)
+
+# FAMILY SIZE
+titanic_full$FamilySize <- as.numeric(titanic_full$SibSp) + as.numeric(titanic_full$Parch) + 1
+tail(titanic_full)
+
+
 ################################################################################
 # Cleaning the Missing Values
 table (titanic_full$Pclass) # Pclass is all compiled
 table (titanic_full$Sex) # Sex is all compiled
 table (titanic_full$SibSp) # Sibling Spouses aboard is all compiled
 table (titanic_full$Parch) # Parent and Children aboard is all compiled
+table (titanic_full$Title) # Title association function as worked well
+
 
 # EMBARKED
 table (titanic_full$Embarked) # we have no boarding port for two people... so we substitute the missing values of the missing port with the most common port, the mode
@@ -227,7 +264,7 @@ titanic_full[is.na(titanic_full$Age), "Age"] # 263 missing values in Age in the 
 nrow(titanic_full[is.na(titanic_full$Age),]) # 263 indeed
 
 # there are two types of lm: the online gradient descent variant (not covered) and the least squares linear regression model (which is affected by outliers)
-# before we aplly this we have to filter out the 
+# before we apply this we have to filter out the 
 
 boxplot (titanic_full$Age) # see that Age is affected by many outliers, R stores these values in "$stats vector
 boxplot.stats(titanic_full$Age)
@@ -241,13 +278,11 @@ boxplot.stats(titanic_full$Age)$stats [5] # the last whisker - anything above 66
 upper.whisker <- boxplot.stats(titanic_full$Age)$stats[5]
 outlier.filter <- titanic_full$Age <= upper.whisker # this will work as an index
 
-
-
-titanic_full[outlier.filter,] # current filter of the non outliers Fare entries
+# titanic_full[outlier.filter,] # current filter of the non outliers Fare entries
 
 # creation of the lm model
 str(titanic_full)
-age.equation = "Age ~ Pclass + Sex + Fare + SibSp + Parch + Embarked" # we do not use Survive, as our test data will not have it...
+age.equation = "Age ~ Pclass + Sex + Fare + SibSp + Parch + Embarked + Title" # we do not use Survive, as our test data will not have it...
 
 age.model <- lm (
   formula = age.equation,
@@ -256,7 +291,7 @@ age.model <- lm (
 
 
 # Prediction section, but not every column is needed to predict.
-age.row <- titanic_full[is.na(titanic_full$Age),c("Pclass", "Sex", "Fare", "SibSp", "Parch", "Embarked")] # query all the rows that have no Fares and give me just the columns I need
+age.row <- titanic_full[is.na(titanic_full$Age),c("Pclass", "Sex", "Fare", "SibSp", "Parch", "Embarked", "Title")] # query all the rows that have no Fares and give me just the columns I need
 age.prediction <- predict (age.model, newdata = age.row)
 
 titanic_full[is.na(titanic_full$Age), "Age"] <- age.prediction # let's substitute the missing Fare value with the predicted value
@@ -288,11 +323,11 @@ boxplot.stats(titanic_full$Fare)$stats [5] # the last whisker - anything above 6
 upper.whisker <- boxplot.stats(titanic_full$Fare)$stats[5]
 outlier.filter <- titanic_full$Fare <= upper.whisker
 
-titanic_full[outlier.filter,] # current filter of the non outliers Fare entries
+# titanic_full[outlier.filter,] # current filter of the non outliers Fare entries
 
 # creation of the lm model
 str(titanic_full)
-fare.equation = "Fare ~ Pclass + Sex + Age + SibSp + Parch + Embarked" # we do not use Survive, as our test data will not have it...
+fare.equation = "Fare ~ Pclass + Sex + Age + SibSp + Parch + Embarked + Title" # we do not use Survive, as our test data will not have it...
 
 fare.model <- lm (
   formula = fare.equation,
@@ -301,31 +336,23 @@ fare.model <- lm (
 
 
 # Prediction section, but not every column is needed to predict.
-fare.row <- titanic_full[is.na(titanic_full$Fare),c("Pclass", "Sex", "Age", "SibSp", "Parch", "Embarked")] # query all the rows that have no Fares and give me just the columns I need
+fare.row <- titanic_full[is.na(titanic_full$Fare),c("Pclass", "Sex", "Age", "SibSp", "Parch", "Embarked", "Title")] # query all the rows that have no Fares and give me just the columns I need
 fare.prediction <- predict (fare.model, newdata = fare.row)
 
 titanic_full[is.na(titanic_full$Fare), "Fare"] <- fare.prediction # let's substitute the missing Fare value with the predicted value
 titanic_full[1044,] # check
 
-################################################################################
-# ADDING NEW FEATURES
 
-
-# TITLES
-titles <- NULL
-for (i in 1:nrows (titanic_full)) {
-  titles <- c (titles, extract_Title(titanic_full[i,"Name"])) 
-}
-titanic_full$Title <- as.factor (titles) 
-
-
-
+# FARE PER PERSON
+titanic_full$FarePerPerson <- as.numeric(titanic_full$Fare) / as.numeric(titanic_full$FamilySize)
 
 ################################################################################
 # CAST STRINGS INTO CATEGORIES
 titanic_full$Pclass <- as.factor(titanic_full$Pclass) 
 titanic_full$Sex <- as.factor(titanic_full$Sex) 
 titanic_full$Embarked <- as.factor(titanic_full$Embarked) 
+titanic_full$Title <- as.factor(titanic_full$Title) 
+# titanic_full$FamilySize <- as.numeric(titanic_full$FamilySize) 
 str(titanic_full)
 
 
@@ -339,7 +366,6 @@ str (titanic_train)
 
 titanic_test <- titanic_full[titanic_full$IsTrainingSet == FALSE,]
 nrow(titanic_test)
-str (titanic_test)
 
 
 ################################################################################
@@ -348,25 +374,27 @@ str (titanic_test)
 # we will use random forest
 # we will make a predictive model of SURVIVED using the Passenger Class, the Sex, the Age, Sibling and Spouse in the titanic as well as Parents and Children, and the port of Embarcation
 # as formula will build the relations
-survive_formula <- as.formula("Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked") 
+str (titanic_test)
+survive_formula <- as.formula("Survived ~ Pclass + Sex + Age + SibSp + Parch + FarePerPerson + Embarked + Title + FamilySize")
 
 # random forest prediction on titanic_train based on the survive_formula
 # (-) we are skipping for now 70/30 split
 # (-) we are skipping cross validation
 # (+) we no longer used the median to predict the missing value of Age, Fare, Embarked, BUT actually fitted an lm model
+# (+) we added a first new Feature (Title, FamilySize)
 # ntree - 500 (defeult)
 # mtry - sqrt (7) 7 is the number of predictors
 # node size - minimum sample per node 1% of the size of the training set
 titanic_model <- randomForest (formula = survive_formula, data = titanic_train, ntree = 5000, mtry = 3, nodesize = 0.1 * nrow (titanic_test))
 
 # so now lets predict
-features_equation <- "Pclass + Sex + Age + SibSp + Parch + Fare + Embarked"
+#features_equation <- "Pclass + Sex + Age + SibSp + Parch + Fare + Embarked + Title" # review why this is not used
 Survived <- predict(titanic_model, newdata = titanic_test) # Survived is the name of the column and it contains the result of the prediction
 
-# let's create the data.frame to store the two colums, the PassengerId and the Survived (0/1) result
+# let's create the data.frame to store the two columns, the PassengerId and the Survived (0/1) result
 PassengerId <- titanic_test$PassengerId
 output.df <- as.data.frame(PassengerId)
 output.df$Survived <- Survived
 
-# Saving the results into csv file to be updated in Kaggle - remeber to version it
-write.csv (output.df, "Data/Kaggle_Submission_V4.csv", row.names = FALSE)
+# Saving the results into csv file to be updated in Kaggle - remember to version it
+write.csv (output.df, "Data/Kaggle_Submission_V14.csv", row.names = FALSE)
