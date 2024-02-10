@@ -28,7 +28,10 @@
 # Clean the environment and Load Libraries
 rm (list = ls())
 # install.packages('randomForest')
+# install.packages ('tidyverse')
+library (tidyverse)
 library(randomForest)
+
 
 ################################################################################
 # Access and Clean the Training Data Files 
@@ -40,6 +43,144 @@ tail (titanic_train) # always check the good read.csv execution
 titanic_test <- read.csv (file ="Data/test.csv", stringsAsFactors = FALSE, header = TRUE) # keep strings as strings
 str (titanic_train) 
 str (titanic_test) # no Survived info
+
+
+################################################################################
+# EDA Section
+
+# Survival Rates per Class -  Hypotheses richer classes had higher survival rate
+titanic_train %>%
+  ggplot(aes(x = as.factor(Pclass), fill = factor(Survived))) +
+  geom_histogram(width = 0.5, stat = "count") +
+  xlab ("Pclass") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+
+# Survival Rates per Sex -  Hypotheses women had higher survival rate
+titanic_train %>%
+  ggplot(aes(x = as.factor(Sex), fill = factor(Survived))) +
+  geom_histogram(stat = "count") +
+  xlab ("Sex") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+
+# Survival Rates per Sibling & Spouses Aboard
+titanic_train %>%
+  ggplot(aes(x = as.factor(SibSp), fill = factor(Survived))) +
+  geom_histogram(width = 0.5, stat = "count") +
+  xlab ("Sibsp") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+
+# Survival Rates per Parents and Children 
+titanic_train %>%
+  ggplot(aes(x = as.factor(Parch), fill = factor(Survived))) +
+  geom_histogram(width = 0.5, stat = "count") +
+  xlab ("Parch") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+
+# Survival Rates per Port of Embarkation 
+titanic_train %>%
+  ggplot(aes(x = as.factor(Embarked), fill = factor(Survived))) +
+  geom_histogram(width = 0.5, stat = "count") +
+  xlab ("Embarked") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+# Distribution per Age
+hist(x = as.numeric(titanic_train$Age))
+
+
+################################################################################
+# Research in names of Miss. Mr. Mrs. Master and other Titles
+# Section deprecated as we will use a FUNCTION to do this
+
+titanic_train$Title <- NA
+
+# Miss.
+misses <- which (str_detect(titanic_train$Name, "Miss."))
+titanic_train[misses,]$Title <- "Miss."
+
+# Mr. Misters before Mrs otherwise it will overwrite the Mrs !!!
+mr <- which (str_detect(titanic_train$Name, "Mr."))
+titanic_train[mr,]$Title <- "Mr."
+
+# Mrs.
+mrs <- which (str_detect(titanic_train$Name, "Mrs."))
+titanic_train[mrs,]$Title <- "Mrs."
+
+# Master.
+masters <- which (str_detect(titanic_train$Name, "Master."))
+titanic_train[masters,]$Title <- "Master."
+
+# Rev.
+rev <- which (str_detect(titanic_train$Name, "Rev."))
+titanic_train[rev,]$Title <- "Rev."
+
+# Dr.
+dr <- which (str_detect(titanic_train$Name, "Dr."))
+titanic_train[dr,]$Title <- "Dr."
+
+# Dme. to Mrs.
+mme <- which (str_detect(titanic_train$Name, "Mme."))
+titanic_train[mme,]$Title <- "Mrs."
+
+# Ms. to Mrs.
+ms <- which (str_detect(titanic_train$Name, "Ms."))
+titanic_train[ms,]$Title <- "Mrs."
+
+# Mlle. to Mrs.
+mlle <- which (str_detect(titanic_train$Name, "Mlle."))
+titanic_train[mlle,]$Title <- "Mrs."
+
+# all Others to Others
+others <- which (is.na(titanic_train$Title))
+titanic_train[others,]$Title <- "Other."
+
+# Survival Rates per Title 
+titanic_train %>%
+  ggplot(aes(x = as.factor(Title), fill = factor(Survived))) +
+  geom_histogram(width = 0.5, stat = "count") +
+  xlab ("Title") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+
+################################################################################
+# Function to extract Titles from Names
+
+extract_Title <- function (name) {
+  name <- as.character(name)
+  
+  if (length (grep ("Miss.", name)) > 0 ) {
+    return ("Miss.")
+  } else if (length (grep ("Master.", name)) > 0 ) {
+    return ("Master.")
+  } else if (length (grep ("Mrs.", name)) > 0 ) {
+    return ("Mrs.")
+  } else if (length (grep ("Miss.", name)) > 0 ) {
+      return ("Miss.")
+  } else if (length (grep ("Mme.", name)) > 0 ) {
+    return ("Mrs.")
+  } else if (length (grep ("Ms.", name)) > 0 ) {
+    return ("Mrs.")
+  } else if (length (grep ("Dr.", name)) > 0 ) {
+    return ("Dr.")
+  } else if (length (grep ("Rev.", name)) > 0 ) {
+    return ("Priest.")
+  } else if (length (grep ("Don.", name)) > 0 ) {
+    return ("Priest.")
+  } else return ("Other.")
+  
+}
+
+################################################################################
+# Section - combination of the two datasets for mutual cleaning
 
 # we will combine the two datasets to clean them together, in order to keep track which entry is which (training or test set) we add a column to store if a row was originally coming from the training or the test set
 titanic_train$IsTrainingSet <- TRUE
@@ -74,9 +215,6 @@ table (titanic_full$Parch) # Parent and Children aboard is all compiled
 table (titanic_full$Embarked) # we have no boarding port for two people... so we substitute the missing values of the missing port with the most common port, the mode
 titanic_full[titanic_full$Embarked == '', "Embarked"] <-'S' # replace with the MODE the two missing values
 table (titanic_full$Embarked) # check that the replacement was ok
-
-
-
 
 ################################################################################
 # AGE - basic option 
@@ -172,6 +310,13 @@ titanic_full[1044,] # check
 ################################################################################
 # ADDING NEW FEATURES
 
+
+# TITLES
+titles <- NULL
+for (i in 1:nrows (titanic_full)) {
+  titles <- c (titles, extract_Title(titanic_full[i,"Name"])) 
+}
+titanic_full$Title <- as.factor (titles) 
 
 
 
