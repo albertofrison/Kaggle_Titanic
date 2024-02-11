@@ -280,7 +280,74 @@ titanic_train %>%
   xlab ("FamilySize") +
   ylab ("Total Count") +
   labs (fill = "Survived")
+# looks like that the larger the family in terms, the worse
 
+
+################################################################################
+# TICKET
+str(titanic_train$Ticket)
+
+# let's look at the first digit of the TICKET - we added to the training set and see how it describes the data
+titanic_train$ticket_first_char <- ifelse (titanic_train$Ticket == "", " ", substr (titanic_train$Ticket, 1,1))
+
+titanic_train %>%
+  ggplot(aes(x = as.factor(ticket_first_char), fill = factor(Survived))) +
+  geom_histogram(width = 1.0, stat = "count") +
+  facet_wrap(~ Title) + # loop variables here (Pclass, Embarked), to see if the ticket is correlated with some other variable
+  xlab ("Ticket (firts letter)") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+# there is not much signal in the Ticket - so probably we will not use it into the model
+# occam razor tells us that simpler things (i.e. logistic regression) are better than more complicated models
+
+
+################################################################################
+# FARES
+
+summary (titanic_full$Fare)
+# some people did not pay any fare at all
+# 50% of the people paid less than £14.something, but the mean is double the median, suggesting that data is really skewed to the right
+
+titanic_train %>%
+  ggplot(aes(x = Fare, fill = factor(Survived))) +
+  geom_histogram(width = 5.0) +
+  facet_wrap(~ Embarked) + # loop variables here (Pclass, Embarked), to see if the ticket is correlated with some other variable
+  xlab ("Fare") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+# it does not look like that the Fare does have lots of prective value
+
+
+
+
+################################################################################
+# CABIN
+
+summary (titanic_train$Cabin)
+str (titanic_train$Cabin)
+
+titanic_train$Cabin <- as.character(titanic_train$Cabin)
+titanic_train$Cabin # looks that some people have multiple cabins, also the first letter can tell the deck?
+
+# replace the missing cabin with "U" for unknown
+titanic_train[which (titanic_train$Cabin == ""), "Cabin"] <- "U"
+unique (titanic_train$Cabin)
+
+titanic_train$Cabin_First_Char <- as.factor (substr(titanic_train$Cabin,1,1))
+str(titanic_train$Cabin_First_Char)
+levels (titanic_train$Cabin_First_Char)
+
+titanic_train %>%
+  ggplot(aes(x = as.factor(Cabin_First_Char), fill = factor(Survived))) +
+  geom_bar() +
+  facet_wrap(~ Embarked) + # loop variables here (Pclass, Embarked), to see if the ticket is correlated with some other variable
+  xlab ("Cabin (First Char)") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+# A-E looks like first Class
+# E-U look like third Class
+# Note: Pclass is already very predictive of the Survival
 
 
 
@@ -505,7 +572,7 @@ nrow(titanic_test)
 # we will make a predictive model of SURVIVED using the Passenger Class, the Sex, the Age, Sibling and Spouse in the titanic as well as Parents and Children, and the port of Embarcation
 # as formula will build the relations
 str (titanic_test)
-survive_formula <- as.formula("Survived ~ Pclass + Sex + Age + SibSp + Parch + FarePerPerson + Embarked + Title + FamilySize")
+survive_formula <- as.formula("Survived ~ Pclass + Sex + Age + SibSp + Parch + Title + FamilySize")
 
 # random forest prediction on titanic_train based on the survive_formula
 # (-) we are skipping for now 70/30 split
@@ -527,4 +594,4 @@ output.df <- as.data.frame(PassengerId)
 output.df$Survived <- Survived
 
 # Saving the results into csv file to be updated in Kaggle - remember to version it
-write.csv (output.df, "Data/Kaggle_Submission_V14.csv", row.names = FALSE)
+write.csv (output.df, "Data/Kaggle_Submission_V15.csv", row.names = FALSE)
