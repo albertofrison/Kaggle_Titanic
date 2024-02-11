@@ -78,14 +78,6 @@ titanic_train %>%
   labs (fill = "Survived")
 
 
-# Survival Rates per Port of Embarkation 
-titanic_train %>%
-  ggplot(aes(x = as.factor(Embarked), fill = factor(Survived))) +
-  geom_histogram(width = 0.5, stat = "count") +
-  xlab ("Embarked") +
-  ylab ("Total Count") +
-  labs (fill = "Survived")
-
 # Distribution per Age
 hist(x = as.numeric(titanic_train$Age))
 
@@ -319,7 +311,6 @@ titanic_train %>%
 
 
 
-
 ################################################################################
 # CABIN
 
@@ -350,6 +341,15 @@ titanic_train %>%
 # Note: Pclass is already very predictive of the Survival
 
 
+
+# Survival Rates per Port of Embarkation 
+titanic_train %>%
+  ggplot(aes(x = as.factor(Embarked), fill = factor(Survived))) +
+  geom_histogram(stat = "count") +
+  facet_wrap(~ Pclass) +
+  xlab ("Embarked") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
 
 
 ################################################################################
