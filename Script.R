@@ -27,7 +27,7 @@
 ################################################################################
 # install.packages('randomForest')
 # install.packages ('tidyverse')
-library (tidyverse)
+library(tidyverse)
 library(randomForest)
 
 # Clean the environment and Load Libraries
@@ -69,15 +69,6 @@ titanic_train %>%
   labs (fill = "Survived")
 
 
-# Survival Rates per Sibling & Spouses Aboard
-titanic_train %>%
-  ggplot(aes(x = as.factor(SibSp), fill = factor(Survived))) +
-  geom_histogram(width = 0.5, stat = "count") +
-  xlab ("Sibsp") +
-  ylab ("Total Count") +
-  labs (fill = "Survived")
-
-
 # Survival Rates per Parents and Children 
 titanic_train %>%
   ggplot(aes(x = as.factor(Parch), fill = factor(Survived))) +
@@ -99,59 +90,198 @@ titanic_train %>%
 hist(x = as.numeric(titanic_train$Age))
 
 
+# ################################################################################
+# # Research in names of Miss. Mr. Mrs. Master and other Titles
+# # This whole section is DEPRECATED deprecated as we will use a FUNCTION to do this
+# 
+# titanic_train$Title <- NA
+# 
+# # Miss.
+# misses <- which (str_detect(titanic_train$Name, "Miss."))
+# titanic_train[misses,]$Title <- "Miss."
+# 
+# # Mr. Misters before Mrs otherwise it will overwrite the Mrs !!!
+# mr <- which (str_detect(titanic_train$Name, "Mr."))
+# titanic_train[mr,]$Title <- "Mr."
+# 
+# # Mrs.
+# mrs <- which (str_detect(titanic_train$Name, "Mrs."))
+# titanic_train[mrs,]$Title <- "Mrs."
+# 
+# # Master.
+# masters <- which (str_detect(titanic_train$Name, "Master."))
+# titanic_train[masters,]$Title <- "Master."
+# 
+# # Rev.
+# rev <- which (str_detect(titanic_train$Name, "Rev."))
+# titanic_train[rev,]$Title <- "Rev."
+# 
+# # Dr.
+# dr <- which (str_detect(titanic_train$Name, "Dr."))
+# titanic_train[dr,]$Title <- "Dr."
+# 
+# # Dme. to Mrs.
+# mme <- which (str_detect(titanic_train$Name, "Mme."))
+# titanic_train[mme,]$Title <- "Mrs."
+# 
+# # Ms. to Mrs.
+# ms <- which (str_detect(titanic_train$Name, "Ms."))
+# titanic_train[ms,]$Title <- "Mrs."
+# 
+# # Mlle. to Mrs.
+# mlle <- which (str_detect(titanic_train$Name, "Mlle."))
+# titanic_train[mlle,]$Title <- "Mrs."
+# 
+# # all Others to Others
+# others <- which (is.na(titanic_train$Title))
+# titanic_train[others,]$Title <- "Other."
+# 
+# 
+# ################################################################################
+
 ################################################################################
-# Research in names of Miss. Mr. Mrs. Master and other Titles
-# Section deprecated as we will use a FUNCTION to do this
+# Feature Engineering
 
-titanic_train$Title <- NA
+# TITLES
+# PASSENGER TITLES
+titles <- NULL
+for (i in 1:nrow (titanic_train)) {
+  titles <- c (titles, extract_Title(titanic_train[i,"Name"])) 
+}
+titanic_train$Title <- as.factor (titles) 
+tail(titanic_train)
 
-# Miss.
-misses <- which (str_detect(titanic_train$Name, "Miss."))
-titanic_train[misses,]$Title <- "Miss."
+# FAMILY SIZE
+titanic_train$FamilySize <- as.numeric(titanic_train$SibSp) + as.numeric(titanic_train$Parch) + 1
+tail(titanic_train)
 
-# Mr. Misters before Mrs otherwise it will overwrite the Mrs !!!
-mr <- which (str_detect(titanic_train$Name, "Mr."))
-titanic_train[mr,]$Title <- "Mr."
 
-# Mrs.
-mrs <- which (str_detect(titanic_train$Name, "Mrs."))
-titanic_train[mrs,]$Title <- "Mrs."
-
-# Master.
-masters <- which (str_detect(titanic_train$Name, "Master."))
-titanic_train[masters,]$Title <- "Master."
-
-# Rev.
-rev <- which (str_detect(titanic_train$Name, "Rev."))
-titanic_train[rev,]$Title <- "Rev."
-
-# Dr.
-dr <- which (str_detect(titanic_train$Name, "Dr."))
-titanic_train[dr,]$Title <- "Dr."
-
-# Dme. to Mrs.
-mme <- which (str_detect(titanic_train$Name, "Mme."))
-titanic_train[mme,]$Title <- "Mrs."
-
-# Ms. to Mrs.
-ms <- which (str_detect(titanic_train$Name, "Ms."))
-titanic_train[ms,]$Title <- "Mrs."
-
-# Mlle. to Mrs.
-mlle <- which (str_detect(titanic_train$Name, "Mlle."))
-titanic_train[mlle,]$Title <- "Mrs."
-
-# all Others to Others
-others <- which (is.na(titanic_train$Title))
-titanic_train[others,]$Title <- "Other."
-
-# Survival Rates per Title 
+# Survival Rates per Title, split by Class
 titanic_train %>%
   ggplot(aes(x = as.factor(Title), fill = factor(Survived))) +
-  geom_histogram(width = 0.5, stat = "count") +
+  geom_bar(binwidth = 0.5, stat = "count") +
+  facet_wrap(~ Pclass) +
   xlab ("Title") +
   ylab ("Total Count") +
   labs (fill = "Survived")
+
+# Survival Rates per Class, split by Title
+titanic_train %>%
+  ggplot(aes(x = as.factor(Pclass), fill = factor(Survived))) +
+  geom_bar(binwidth = 0.5, stat = "count") +
+  facet_wrap(~ Title) +
+  xlab ("Pclass") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+# Survival Rates per Sex, split by Class
+titanic_train %>%
+  ggplot(aes(x = as.factor(Sex), fill = factor(Survived))) +
+  geom_bar(binwidth = 0.5, stat = "count") +
+  facet_wrap(~ Pclass) +
+  xlab ("Sex") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+#Note: it is counter intuitive to see that males in second class are worse of than males in first and third class
+
+# Survival Rates per Age, split by Class, Sex
+summary (titanic_test$Age)
+titanic_train %>%
+  ggplot(aes(x = Age, fill = Survived)) +
+  geom_histogram(binwidth = 10) +
+  facet_wrap(~ Sex + Pclass) +
+  xlab ("Age") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+#Note: women and children first seems correct, attention that pattern always get worse in 3rd class
+
+
+# Let's see if Master. is a good proxy of the age of a boy
+titanic_train %>%
+  filter  (Title =="Master.") %>%
+  select(Age) %>%
+    summary()
+# IT IS 
+
+# Let's see if Miss. is a good proxy of the age of a woman
+titanic_train %>%
+  filter  (Title =="Miss.") %>%
+  select(Age) %>%
+  summary()
+# IT IS NOT
+
+# let' see visually how Misses do in terms of survival
+titanic_train %>%
+  filter  (Title == "Miss.") %>%
+    filter ((SibSp == 0) & (Parch == 0)) %>% # travelling alone - also change the ggtitle here below
+      ggplot(aes(x = Age, fill = Survived)) +
+      geom_histogram(binwidth = 5) +
+      facet_wrap(~ Pclass) +
+      # ggtitle ("Survival Rates for Miss. by Age and Pclass") +
+      ggtitle ("Survival Rates for Miss. by Age and Pclass (TRAVELLING ALONE)") +
+      xlab("Age")
+      ylab ("Total Count") +
+      ggtitle ("Age for Miss. by Pclass") +
+      labs (fill = "Survived")
+# Note: Misses are females across all ages, in Class 1 and 2 normally survive, in 3rd class it is more of a 50:50 except for the older (i.e. 30ish)
+# Note: also note that there are much more females in 3rd class so we need to be attentive on how we predict this class
+    
+titanic_train %>%
+  filter  (Title =="Master.") %>%
+    ggplot(aes(x = as.factor (Title), fill = Survived)) +
+    geom_bar(binwidth = 0.5, stat = "count") +
+    facet_wrap(~ Pclass) +
+    xlab ("Title") +
+    ylab ("Total Count") +
+    labs (fill = "Survived")
+
+
+
+
+
+# SIBSP
+# Survival Rates per Sibling & Spouses Aboard
+titanic_train %>%
+  select (SibSp) %>%
+  summary()
+# it could be treated as factor then
+
+titanic_train %>%
+  ggplot(aes(x = as.factor(SibSp), fill = factor(Survived))) +
+  geom_histogram(width = 1.0, stat = "count") +
+  facet_wrap(~ Pclass) +
+  xlab ("Sibsp") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+# looks like that the larger the family in terms of Siblings or Spouses, the worse
+
+
+# PARCH
+# Survival Rates per Parents and Children Aboard
+titanic_train %>%
+  select (Parch) %>%
+  summary()
+# it could be treated as factor then
+
+titanic_train %>%
+  ggplot(aes(x = as.factor(Parch), fill = factor(Survived))) +
+  geom_histogram(width = 1.0, stat = "count") +
+  facet_wrap(~ Pclass) +
+  xlab ("Parch") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+# looks like that the larger the family in terms of Parent and Children, the worse
+
+
+titanic_train %>%
+  ggplot(aes(x = as.factor(FamilySize), fill = factor(Survived))) +
+  geom_histogram(width = 1.0, stat = "count") +
+  facet_wrap(~ Sex + Pclass) +
+  xlab ("FamilySize") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+
 
 
 
