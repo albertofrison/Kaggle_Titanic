@@ -28,17 +28,11 @@
 # install.packages('randomForest')
 # install.packages ('tidyverse')
 # install.packages ('caret')
-<<<<<<< HEAD
 # install.packages ('doSNOW')
 library(tidyverse)
 library(randomForest)
 library (caret)
 library (doSNOW)
-=======
-library(tidyverse)
-library(randomForest)
-library (caret)
->>>>>>> refs/remotes/origin/main
 
 # Clean the environment and Load Libraries
 rm (list = ls())
@@ -518,52 +512,8 @@ varImpPlot(rf.07)
 # WRAP UP
 rf.05 # is the best model so far in terms of accuracy
 1-0.1796 # 82.04% accuracy (in the training set)
-<<<<<<< HEAD
 
 
-
-
-################################################################################
-# CROSS VALIDATION
-################################################################################
-# Cross Validation is a way to do things: 1) maximise the value of the (limited) training data and 2) improve the performance of the prediction with unseen data
-# Random Forrest is cool because it gives you the estimate of the error rate
-
-
-# Make subset of Test Dataset to match with the requirements of rf.05
-titanic_test_sub <- titanic_full[892:1309, c("Pclass", "Title", "FamilySize")]
-
-# Make a Prediction
-rf.05.prediction <- predict(rf.05, titanic_test_sub)
-
-# Store into a df
-output.df <- data.frame(PassengerId = rep(892:1309), Survived = rf.05.prediction)
-
-# Store into a csv for saving and upload into Kaggle (remeber to version it)
-write.csv (output.df, "Data/Kaggle_Submission_V16.csv", row.names = FALSE)
-
-# ==> Submit to Kagle https://www.kaggle.com/competitions/titanic/submissions
-
-
-# Back test of the submission
-rf.05
-1-0.1796
-# back test the overall accuracy in kaggle is 0.7799 (on the test set) vs 0.8204 (on the training set)
-=======
->>>>>>> refs/remotes/origin/main
-
-
-################################################################################
-# entering CARET
-################################################################################
-
-# Research has shown that 10-fold Cross Validation repeated 10 times is the best place to start
-
-
-<<<<<<< HEAD
-set.seed (2348)
-cv.10.folds <- createMultiFolds()
-=======
 ################################################################################
 # CROSS VALIDATION
 ################################################################################
@@ -599,7 +549,11 @@ rf.05
 
 
 
->>>>>>> refs/remotes/origin/main
+
+
+
+
+
 
 
 ################################################################################
