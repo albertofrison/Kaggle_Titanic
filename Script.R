@@ -27,8 +27,10 @@
 ################################################################################
 # install.packages('randomForest')
 # install.packages ('tidyverse')
+# install.packages ('caret')
 library(tidyverse)
 library(randomForest)
+library (caret)
 
 # Clean the environment and Load Libraries
 rm (list = ls())
@@ -37,6 +39,8 @@ rm (list = ls())
 
 ################################################################################
 # Access and Clean the Training Data Files 
+################################################################################
+
 titanic_train <- read.csv (file ="Data/train.csv", stringsAsFactors = FALSE, header = TRUE) # keep strings as strings
 head (titanic_train) # always check the good read.csv execution
 tail (titanic_train) # always check the good read.csv execution
@@ -46,52 +50,17 @@ titanic_test <- read.csv (file ="Data/test.csv", stringsAsFactors = FALSE, heade
 str (titanic_train) 
 str (titanic_test) # no Survived info
 
-
+###############################################################################
+# Combination of the two datasets for mutual cleaning
 ################################################################################
-################################################################################
-# Basic Data Analysis Section
-
-# Survival Rates per Class -  Hypotheses richer classes had higher survival rate
-titanic_train %>%
-  ggplot(aes(x = as.factor(Pclass), fill = factor(Survived))) +
-  geom_histogram(width = 0.5, stat = "count") +
-  xlab ("Pclass") +
-  ylab ("Total Count") +
-  labs (fill = "Survived")
-
-
-# Survival Rates per Sex -  Hypotheses women had higher survival rate
-titanic_train %>%
-  ggplot(aes(x = as.factor(Sex), fill = factor(Survived))) +
-  geom_histogram(stat = "count") +
-  xlab ("Sex") +
-  ylab ("Total Count") +
-  labs (fill = "Survived")
-
-
-# Survival Rates per Parents and Children 
-titanic_train %>%
-  ggplot(aes(x = as.factor(Parch), fill = factor(Survived))) +
-  geom_histogram(width = 0.5, stat = "count") +
-  xlab ("Parch") +
-  ylab ("Total Count") +
-  labs (fill = "Survived")
-
-
-# Distribution per Age
-hist(x = as.numeric(titanic_train$Age))
-
-
-################################################################################
-# Section - combination of the two datasets for mutual cleaning
 
 # we will combine the two datasets to clean them together, in order to keep track which entry is which (training or test set) we add a column to store if a row was originally coming from the training or the test set
-titanic_train$IsTrainingSet <- TRUE
-titanic_test$IsTrainingSet <- FALSE
+# titanic_train$IsTrainingSet <- TRUE
+# titanic_test$IsTrainingSet <- FALSE
 
 # in order to combine the datasets we need to make sure that the structure (names and number cols of the header must match)
-ncol(titanic_train) # 13 columns
-ncol(titanic_test) # 12 columns
+ncol(titanic_train) # 12 columns
+ncol(titanic_test) # 11 columns
 
 # so let's check how the headers of each of the datasets are called
 names (titanic_train)
@@ -107,13 +76,45 @@ titanic_test$Survived <- as.factor(titanic_test$Survived)
 
 titanic_full <- rbind (titanic_train, titanic_test) # SQL union - a vertical Join of the two data sets
 nrow(titanic_full) # 1309 --- 891 + 418 - 1309 # 0 so the math checks out
-table (titanic_full$IsTrainingSet) # let's check if the combination went well
 
 
+################################################################################
+# Section - Basic Data Analysis - 01
+################################################################################
+
+# Survival Rates per Class -  Hypotheses richer classes had higher survival rate
+titanic_full[1:891,] %>%
+  ggplot(aes(x = as.factor(Pclass), fill = factor(Survived))) +
+  geom_histogram(width = 0.5, stat = "count") +
+  xlab ("Pclass") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+# Survival Rates per Sex -  Hypotheses women had higher survival rate
+titanic_full[1:891,] %>%
+  ggplot(aes(x = as.factor(Sex), fill = factor(Survived))) +
+  geom_histogram(stat = "count") +
+  xlab ("Sex") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+
+# Survival Rates per Parents and Children 
+titanic_full[1:891,] %>%
+  ggplot(aes(x = as.factor(Parch), fill = factor(Survived))) +
+  geom_histogram(width = 0.5, stat = "count") +
+  xlab ("Parch") +
+  ylab ("Total Count") +
+  labs (fill = "Survived")
+
+
+# Distribution per Age
+hist(x = as.numeric(titanic_full[1:891,]$Age))
 
 
 ################################################################################
 # FEATURE ENGENEERING
+################################################################################
 # TITLES
 # Function to extract Titles from Names
 
@@ -152,6 +153,7 @@ extract_Title <- function (name) {
     return ("Military.")
   } else return ("Other.")
 }
+################################################################################
 
 
 # TITANIC FULL
@@ -163,34 +165,19 @@ for (i in 1:nrow (titanic_full)) {
 titanic_full$Title <- as.factor (titles) 
 
 # FAMILY SIZE
-titanic_full$FamilySize <- as.numeric(titanic_full$SibSp) + as.numeric(titanic_full$Parch) + 1
+titanic_full$FamilySize <- as.factor(as.numeric(titanic_full$SibSp) + as.numeric(titanic_full$Parch) + 1)
 
 # check results
 head(titanic_full)
 tail(titanic_full)
 
 
-
-# TITANIC TRAIN
-# TITLES
-titles <- NULL
-for (i in 1:nrow (titanic_train)) {
-  titles <- c (titles, extract_Title(titanic_train[i,"Name"])) 
-}
-titanic_train$Title <- as.factor (titles) 
-
-# FAMILY SIZE
-titanic_train$FamilySize <- as.factor(as.numeric(titanic_train$SibSp) + as.numeric(titanic_train$Parch) + 1)
-
-# check results
-head(titanic_train)
-tail(titanic_train)
-
-
 ################################################################################
-# Section - Data Analysis
+# Section - Basic Data Analysis - 02
+################################################################################
+
 # Survival Rates per Title, split by Class
-titanic_train %>%
+titanic_full[1:891,] %>%
   ggplot(aes(x = as.factor(Title), fill = factor(Survived))) +
  # geom_bar(binwidth = 0.5, stat = "count") +
   geom_bar(stat = "count") +
@@ -200,7 +187,7 @@ titanic_train %>%
   labs (fill = "Survived")
 
 # Survival Rates per Class, split by Title
-titanic_train %>%
+titanic_full[1:891,] %>%
   ggplot(aes(x = as.factor(Pclass), fill = factor(Survived))) +
   geom_bar(binwidth = 0.5, stat = "count") +
   facet_wrap(~ Title) +
@@ -209,7 +196,7 @@ titanic_train %>%
   labs (fill = "Survived")
 
 # Survival Rates per Sex, split by Class
-titanic_train %>%
+titanic_full[1:891,] %>%
   ggplot(aes(x = as.factor(Sex), fill = factor(Survived))) +
   geom_bar(binwidth = 0.5, stat = "count") +
   facet_wrap(~ Pclass) +
@@ -219,8 +206,9 @@ titanic_train %>%
 #Note: it is counter intuitive to see that males in second class are worse of than males in first and third class
 
 # Survival Rates per Age, split by Class, Sex
-summary (titanic_test$Age)
-titanic_train %>%
+summary (titanic_full[1:891,]$Age)
+
+titanic_full[1:891,] %>%
   ggplot(aes(x = Age, fill = Survived)) +
   geom_histogram(binwidth = 10) +
   facet_wrap(~ Sex + Pclass) +
@@ -230,21 +218,21 @@ titanic_train %>%
 #Note: women and children first seems correct, attention that pattern always get worse in 3rd class
 
 # Let's see if Master. is a good proxy of the age of a boy
-titanic_train %>%
+titanic_full[1:891,] %>%
   filter  (Title =="Master.") %>%
   select(Age) %>%
     summary()
 # IT IS 
 
 # Let's see if Miss. is a good proxy of the age of a woman
-titanic_train %>%
+titanic_full[1:891,] %>%
   filter  (Title =="Miss.") %>%
   select(Age) %>%
   summary()
 # IT IS NOT
 
 # let' see visually how Misses do in terms of survival
-titanic_train %>%
+titanic_full[1:891,] %>%
   filter  (Title == "Miss.") %>%
     filter ((SibSp == 0) & (Parch == 0)) %>% # travelling alone - also change the ggtitle here below
       ggplot(aes(x = Age, fill = as.factor(Survived))) +
@@ -259,7 +247,7 @@ titanic_train %>%
 # Note: Misses are females across all ages, in Class 1 and 2 normally survive, in 3rd class it is more of a 50:50 except for the older (i.e. 30ish)
 # Note: also note that there are much more females in 3rd class so we need to be attentive on how we predict this class
     
-titanic_train %>%
+titanic_full[1:891,] %>%
   filter  (Title =="Master.") %>%
     ggplot(aes(x = as.factor (Title), fill = Survived)) +
     geom_bar(binwidth = 0.5, stat = "count") +
@@ -271,12 +259,12 @@ titanic_train %>%
 
 # SIBSP
 # Survival Rates per Sibling & Spouses Aboard
-titanic_train %>%
+titanic_full[1:891,] %>%
   select (SibSp) %>%
   summary()
 # it could be treated as factor then
 
-titanic_train %>%
+titanic_full[1:891,] %>%
   ggplot(aes(x = as.factor(SibSp), fill = factor(Survived))) +
   geom_histogram(width = 1.0, stat = "count") +
   facet_wrap(~ Pclass) +
@@ -288,12 +276,12 @@ titanic_train %>%
 
 # PARCH
 # Survival Rates per Parents and Children Aboard
-titanic_train %>%
+titanic_full[1:891,] %>%
   select (Parch) %>%
   summary()
 # it could be treated as factor then
 
-titanic_train %>%
+titanic_full[1:891,] %>%
   ggplot(aes(x = as.factor(Parch), fill = factor(Survived))) +
   geom_histogram(width = 1.0, stat = "count") +
   facet_wrap(~ Pclass) +
@@ -302,7 +290,7 @@ titanic_train %>%
   labs (fill = "Survived")
 # looks like that the larger the family in terms of Parent and Children, the worse
 
-titanic_train %>%
+titanic_full[1:891,] %>%
   ggplot(aes(x = as.factor(FamilySize), fill = factor(Survived))) +
   geom_histogram(width = 1.0, stat = "count") +
   facet_wrap(~ Sex + Pclass) +
@@ -314,12 +302,12 @@ titanic_train %>%
 
 ################################################################################
 # TICKET
-str(titanic_train$Ticket)
+str(titanic_full[1:891,]$Ticket)
 
 # let's look at the first digit of the TICKET - we added to the training set and see how it describes the data
-titanic_train$ticket_first_char <- ifelse (titanic_train$Ticket == "", " ", substr (titanic_train$Ticket, 1,1))
+titanic_full$ticket_first_char <- ifelse (titanic_full$Ticket == "", " ", substr (titanic_full$Ticket, 1,1))
 
-titanic_train %>%
+titanic_full[1:891,] %>%
   ggplot(aes(x = as.factor(ticket_first_char), fill = factor(Survived))) +
   geom_histogram(width = 1.0, stat = "count") +
   facet_wrap(~ Title) + # loop variables here (Pclass, Embarked), to see if the ticket is correlated with some other variable
@@ -333,11 +321,11 @@ titanic_train %>%
 ################################################################################
 # FARES
 
-summary (titanic_full$Fare)
+summary (titanic_full[1:891,]$Fare)
 # some people did not pay any fare at all
 # 50% of the people paid less than £14.something, but the mean is double the median, suggesting that data is really skewed to the right
 
-titanic_train %>%
+titanic_full[1:891,] %>%
   ggplot(aes(x = Fare, fill = factor(Survived))) +
   geom_histogram(width = 5.0) +
   facet_wrap(~ Embarked) + # loop variables here (Pclass, Embarked), to see if the ticket is correlated with some other variable
@@ -350,21 +338,21 @@ titanic_train %>%
 ################################################################################
 # CABIN
 
-summary (titanic_train$Cabin)
-str (titanic_train$Cabin)
+summary (titanic_full[1:891,]$Cabin)
+str (titanic_full[1:891,]$Cabin)
 
-titanic_train$Cabin <- as.character(titanic_train$Cabin)
-titanic_train$Cabin # looks that some people have multiple cabins, also the first letter can tell the deck?
+titanic_full$Cabin <- as.character(titanic_full$Cabin)
+titanic_full[1:891,]$Cabin # looks that some people have multiple cabins, also the first letter can tell the deck?
 
 # replace the missing cabin with "U" for unknown
-titanic_train[which (titanic_train$Cabin == ""), "Cabin"] <- "U"
-unique (titanic_train$Cabin)
+titanic_full[which (titanic_full$Cabin == ""), "Cabin"] <- "U"
+unique (titanic_full$Cabin)
 
-titanic_train$Cabin_First_Char <- as.factor (substr(titanic_train$Cabin,1,1))
-str(titanic_train$Cabin_First_Char)
-levels (titanic_train$Cabin_First_Char)
+titanic_full$Cabin_First_Char <- as.factor (substr(titanic_full$Cabin,1,1))
+str(titanic_full$Cabin_First_Char)
+levels (titanic_full$Cabin_First_Char)
 
-titanic_train %>%
+titanic_full[1:891,] %>%
   ggplot(aes(x = as.factor(Cabin_First_Char), fill = factor(Survived))) +
   geom_bar() +
   facet_wrap(~ Embarked) + # loop variables here (Pclass, Embarked), to see if the ticket is correlated with some other variable
@@ -379,7 +367,7 @@ titanic_train %>%
 ################################################################################
 # EMBARKED
 # Survival Rates per Port of Embarkation 
-titanic_train %>%
+titanic_full[1:891,] %>%
   ggplot(aes(x = as.factor(Embarked), fill = factor(Survived))) +
   geom_histogram(stat = "count") +
   facet_wrap(~ Pclass) +
@@ -393,8 +381,8 @@ titanic_train %>%
 # 01
 # just with PClass and Title
 
-rf.train.01 <- titanic_train[, c("Pclass", "Title")]
-rf.label <- as.factor (titanic_train$Survived)
+rf.train.01 <- titanic_full[1:891, c("Pclass", "Title")]
+rf.label <- as.factor (titanic_full[1:891,]$Survived)
 
 set.seed (1234)
 rf.01 <- randomForest (x = rf.train.01, y = rf.label, importance = TRUE, ntree = 1000)
@@ -427,8 +415,8 @@ varImpPlot(rf.01)
 # 02
 # with PClass and Title and SibSp
 
-rf.train.02 <- titanic_train[, c("Pclass", "Title", "SibSp")]
-rf.label <- as.factor (titanic_train$Survived)
+rf.train.02 <- titanic_full[1:891, c("Pclass", "Title", "SibSp")]
+rf.label <- as.factor (titanic_full[1:891,]$Survived)
 
 set.seed (1234)
 rf.02 <- randomForest (x = rf.train.02, y = rf.label, importance = TRUE, ntree = 1000)
@@ -444,45 +432,42 @@ varImpPlot(rf.02)
 (0.5000000 - 0.3274854)*100
 # Attention that in any application error type 1 and 2 have a different imporance, for example telling somebody that is sick while he is not or that is fine while he is sick
 
-
 ################################################################################
 # 03
 # with PClass and Title and Parch
 
-rf.train.03 <- titanic_train[, c("Pclass", "Title", "Parch")]
-rf.label <- as.factor (titanic_train$Survived)
+rf.train.03 <- titanic_full[1:891, c("Pclass", "Title", "Parch")]
+rf.label <- as.factor (titanic_full[1:891,]$Survived)
 
 set.seed (1234)
 rf.03 <- randomForest (x = rf.train.03, y = rf.label, importance = TRUE, ntree = 1000)
 rf.03
 varImpPlot(rf.03)
-
 # small improvement from the 01 model, Parch looks like less predictive than SibSp
-
 
 ################################################################################
 # 04
 # with PClass and Title plus combination of SibSp and Parch
 
-rf.train.04 <- titanic_train[, c("Pclass", "Title", "SibSp", "Parch")]
-rf.label <- as.factor (titanic_train$Survived)
+rf.train.04 <- titanic_full[1:891, c("Pclass", "Title", "SibSp", "Parch")]
+rf.label <- as.factor (titanic_full[1:891,]$Survived)
 
 set.seed (1234)
 rf.04 <- randomForest (x = rf.train.04, y = rf.label, importance = TRUE, ntree = 1000)
 rf.01
 rf.04
 varImpPlot(rf.04)
-
 # Error rate decreased from 20.88% to 18.41%
-
 
 ################################################################################
 # 05
 # with PClass and Title plus the Family Size
 
-rf.train.05 <- titanic_train[, c("Pclass", "Title", "FamilySize")]
-# warning I had to switch the FamilySize from numeric to factor
-rf.label <- as.factor (titanic_train$Survived)
+rf.train.05 <- titanic_full[1:891, c("Pclass", "Title", "FamilySize")]
+# remember to use FamilySize as Factor
+
+str(rf.train.05)
+rf.label <- as.factor (titanic_full[1:891,]$Survived)
 
 set.seed (1234)
 rf.05 <- randomForest (x = rf.train.05, y = rf.label, importance = TRUE, ntree = 1000)
@@ -497,12 +482,12 @@ varImpPlot(rf.05)
 # 06
 # with PClass, Title plus the Family Size and SibSp
 
-rf.train.06 <- titanic_train[, c("Pclass", "Title", "SibSp","FamilySize")]
-rf.label <- as.factor (titanic_train$Survived)
+rf.train.06 <- titanic_full[1:891, c("Pclass", "Title", "SibSp","FamilySize")]
+rf.label <- as.factor (titanic_full[1:891]$Survived)
 
 set.seed (1234)
 rf.06 <- randomForest (x = rf.train.06, y = rf.label, importance = TRUE, ntree = 1000)
-rf.01
+rf.05
 rf.06
 varImpPlot(rf.06)
 # adding SibSp to FamilySize the situation get worse
@@ -511,8 +496,8 @@ varImpPlot(rf.06)
 # 07
 # with PClass, Title plus the Family Size and Parch
 
-rf.train.07 <- titanic_train[, c("Pclass", "Title", "Parch","FamilySize")]
-rf.label <- as.factor (titanic_train$Survived)
+rf.train.07 <- titanic_full[1:891, c("Pclass", "Title", "Parch","FamilySize")]
+rf.label <- as.factor (titanic_full[1:891,]$Survived)
 
 set.seed (1234)
 rf.07 <- randomForest (x = rf.train.07, y = rf.label, importance = TRUE, ntree = 1000)
@@ -521,11 +506,45 @@ rf.07
 varImpPlot(rf.07)
 # adding Parch to FamilySize the situation get worse from SibSp
 
-
 ################################################################################
 # WRAP UP
-rf.05
+rf.05 # is the best model so far in terms of accuracy
+1-0.1796 # 82.04% accuracy (in the training set)
 
+
+
+
+################################################################################
+# CROSS VALIDATION
+################################################################################
+# Cross Validation is a way to do things: 1) maximise the value of the (limited) training data and 2) improve the performance of the prediction with unseen data
+# Random Forrest is cool because it gives you the estimate of the error rate
+
+
+# Make subset of Test Dataset to match with the requirements of rf.05
+titanic_test_sub <- titanic_full[892:1309, c("Pclass", "Title", "FamilySize")]
+
+# Make a Prediction
+rf.05.prediction <- predict(rf.05, titanic_test_sub)
+
+# Store into a df
+output.df <- data.frame(PassengerId = rep(892:1309), Survived = rf.05.prediction)
+
+# Store into a csv for saving and upload into Kaggle (remeber to version it)
+write.csv (output.df, "Data/Kaggle_Submission_V16.csv", row.names = FALSE)
+
+# ==> Submit to Kagle https://www.kaggle.com/competitions/titanic/submissions
+
+
+# Back test of the submission
+rf.05
+1-0.1796
+# back test the overall accuracy in kaggle is 0.7799 (on the test set) vs 0.8204 (on the training set)
+
+
+################################################################################
+# entering CARET
+################################################################################
 
 
 
@@ -691,8 +710,7 @@ PassengerId <- titanic_test$PassengerId
 output.df <- as.data.frame(PassengerId)
 output.df$Survived <- Survived
 
-# Saving the results into csv file to be updated in Kaggle - remember to version it
-write.csv (output.df, "Data/Kaggle_Submission_V15.csv", row.names = FALSE)
+
 
 
 
