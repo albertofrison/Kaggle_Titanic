@@ -2,7 +2,7 @@
 # KAGGLE COMPETITION
 # Titanic - Machine Learning from Disaster
 # Competition URL: https://www.kaggle.com/competitions/titanic
-# Source video from Data Science Dojo - www.youtube.com/@Datasciencedojo
+# Source video from Data Science Dojo - www.youtube.com/@Datasciencedojo and David Langer on YouTube
 # Made with ♥︎ by Alberto Frison
 # Created on February 2023
 ################################################################################
@@ -16,9 +16,9 @@
 ################################################################################
 # TO DO LIST
 # 01. Review the entire exercise with EDA (not yet done)
-# Source: David Langer on YouTube
 # 02. Add more features (Titles, Decks, Fare $, Family Size, ...) and combinations 
 # 03. Improve the randomforest with cross validation (and 70/30)
+# 04. Watch Videos on https://www.youtube.com/@ProfNandoDF/search?query=random%20forest
 ################################################################################
 
 
@@ -49,7 +49,7 @@ str (titanic_test) # no Survived info
 
 ################################################################################
 ################################################################################
-# EDA Section
+# Basic Data Analysis Section
 
 # Survival Rates per Class -  Hypotheses richer classes had higher survival rate
 titanic_train %>%
@@ -82,76 +82,118 @@ titanic_train %>%
 hist(x = as.numeric(titanic_train$Age))
 
 
-# ################################################################################
-# # Research in names of Miss. Mr. Mrs. Master and other Titles
-# # This whole section is DEPRECATED deprecated as we will use a FUNCTION to do this
-# 
-# titanic_train$Title <- NA
-# 
-# # Miss.
-# misses <- which (str_detect(titanic_train$Name, "Miss."))
-# titanic_train[misses,]$Title <- "Miss."
-# 
-# # Mr. Misters before Mrs otherwise it will overwrite the Mrs !!!
-# mr <- which (str_detect(titanic_train$Name, "Mr."))
-# titanic_train[mr,]$Title <- "Mr."
-# 
-# # Mrs.
-# mrs <- which (str_detect(titanic_train$Name, "Mrs."))
-# titanic_train[mrs,]$Title <- "Mrs."
-# 
-# # Master.
-# masters <- which (str_detect(titanic_train$Name, "Master."))
-# titanic_train[masters,]$Title <- "Master."
-# 
-# # Rev.
-# rev <- which (str_detect(titanic_train$Name, "Rev."))
-# titanic_train[rev,]$Title <- "Rev."
-# 
-# # Dr.
-# dr <- which (str_detect(titanic_train$Name, "Dr."))
-# titanic_train[dr,]$Title <- "Dr."
-# 
-# # Dme. to Mrs.
-# mme <- which (str_detect(titanic_train$Name, "Mme."))
-# titanic_train[mme,]$Title <- "Mrs."
-# 
-# # Ms. to Mrs.
-# ms <- which (str_detect(titanic_train$Name, "Ms."))
-# titanic_train[ms,]$Title <- "Mrs."
-# 
-# # Mlle. to Mrs.
-# mlle <- which (str_detect(titanic_train$Name, "Mlle."))
-# titanic_train[mlle,]$Title <- "Mrs."
-# 
-# # all Others to Others
-# others <- which (is.na(titanic_train$Title))
-# titanic_train[others,]$Title <- "Other."
-# 
-# 
-# ################################################################################
+################################################################################
+# Section - combination of the two datasets for mutual cleaning
+
+# we will combine the two datasets to clean them together, in order to keep track which entry is which (training or test set) we add a column to store if a row was originally coming from the training or the test set
+titanic_train$IsTrainingSet <- TRUE
+titanic_test$IsTrainingSet <- FALSE
+
+# in order to combine the datasets we need to make sure that the structure (names and number cols of the header must match)
+ncol(titanic_train) # 13 columns
+ncol(titanic_test) # 12 columns
+
+# so let's check how the headers of each of the datasets are called
+names (titanic_train)
+names (titanic_test) # Survived is missing in the test dataset...
+titanic_test$Survived <- NA # ... and we add it so we can then bind it to the training set
+
+# we are about to merge / bind the two data sets, let's just see how many rows there are
+nrow(titanic_train) # 891
+nrow(titanic_test) # 418
+
+titanic_train$Survived <- as.factor(titanic_train$Survived)
+titanic_test$Survived <- as.factor(titanic_test$Survived)
+
+titanic_full <- rbind (titanic_train, titanic_test) # SQL union - a vertical Join of the two data sets
+nrow(titanic_full) # 1309 --- 891 + 418 - 1309 # 0 so the math checks out
+table (titanic_full$IsTrainingSet) # let's check if the combination went well
+
+
+
 
 ################################################################################
-# Feature Engineering
-
+# FEATURE ENGENEERING
 # TITLES
-# PASSENGER TITLES
+# Function to extract Titles from Names
+
+extract_Title <- function (name) {
+  name <- as.character(name)
+  
+  if (length (grep ("Miss.", name)) > 0 ) {
+    return ("Miss.")
+  } else if (length (grep ("Master.", name)) > 0 ) {
+    return ("Master.")
+  } else if (length (grep ("Mrs.", name)) > 0 ) {
+    return ("Mrs.")
+  } else if (length (grep ("Miss.", name)) > 0 ) {
+    return ("Miss.")
+  } else if (length (grep ("Mlle.", name)) > 0 ) {
+    return ("Miss.")
+  } else if (length (grep ("Mme.", name)) > 0 ) {
+    return ("Mrs.")
+  } else if (length (grep ("Ms.", name)) > 0 ) {
+    return ("Mrs.")
+  } else if (length (grep ("Mr.", name)) > 0 ) {
+    return ("Mr.")
+  } else if (length (grep ("Dr.", name)) > 0 ) {
+    return ("Dr.")
+  } else if (length (grep ("Rev.", name)) > 0 ) {
+    return ("Priest.")
+  } else if (length (grep ("Don.", name)) > 0 ) {
+    return ("Priest.")
+  } else if (length (grep ("Dona.", name)) > 0 ) {
+    return ("Mrs.")
+  }  else if (length (grep ("Col.", name)) > 0 ) {
+    return ("Military.")
+  } else if (length (grep ("Capt.", name)) > 0 ) {
+    return ("Military.")
+  } else if (length (grep ("Major.", name)) > 0 ) {
+    return ("Military.")
+  } else return ("Other.")
+}
+
+
+# TITANIC FULL
+# TITLES
+titles <- NULL
+for (i in 1:nrow (titanic_full)) {
+  titles <- c (titles, extract_Title(titanic_full[i,"Name"])) 
+}
+titanic_full$Title <- as.factor (titles) 
+
+# FAMILY SIZE
+titanic_full$FamilySize <- as.numeric(titanic_full$SibSp) + as.numeric(titanic_full$Parch) + 1
+
+# check results
+head(titanic_full)
+tail(titanic_full)
+
+
+
+# TITANIC TRAIN
+# TITLES
 titles <- NULL
 for (i in 1:nrow (titanic_train)) {
   titles <- c (titles, extract_Title(titanic_train[i,"Name"])) 
 }
 titanic_train$Title <- as.factor (titles) 
-tail(titanic_train)
 
 # FAMILY SIZE
-titanic_train$FamilySize <- as.numeric(titanic_train$SibSp) + as.numeric(titanic_train$Parch) + 1
+titanic_train$FamilySize <- as.factor(as.numeric(titanic_train$SibSp) + as.numeric(titanic_train$Parch) + 1)
+
+# check results
+head(titanic_train)
 tail(titanic_train)
 
 
+################################################################################
+# Section - Data Analysis
 # Survival Rates per Title, split by Class
 titanic_train %>%
   ggplot(aes(x = as.factor(Title), fill = factor(Survived))) +
-  geom_bar(binwidth = 0.5, stat = "count") +
+ # geom_bar(binwidth = 0.5, stat = "count") +
+  geom_bar(stat = "count") +
   facet_wrap(~ Pclass) +
   xlab ("Title") +
   ylab ("Total Count") +
@@ -187,7 +229,6 @@ titanic_train %>%
   labs (fill = "Survived")
 #Note: women and children first seems correct, attention that pattern always get worse in 3rd class
 
-
 # Let's see if Master. is a good proxy of the age of a boy
 titanic_train %>%
   filter  (Title =="Master.") %>%
@@ -206,7 +247,7 @@ titanic_train %>%
 titanic_train %>%
   filter  (Title == "Miss.") %>%
     filter ((SibSp == 0) & (Parch == 0)) %>% # travelling alone - also change the ggtitle here below
-      ggplot(aes(x = Age, fill = Survived)) +
+      ggplot(aes(x = Age, fill = as.factor(Survived))) +
       geom_histogram(binwidth = 5) +
       facet_wrap(~ Pclass) +
       # ggtitle ("Survival Rates for Miss. by Age and Pclass") +
@@ -226,9 +267,6 @@ titanic_train %>%
     xlab ("Title") +
     ylab ("Total Count") +
     labs (fill = "Survived")
-
-
-
 
 
 # SIBSP
@@ -263,7 +301,6 @@ titanic_train %>%
   ylab ("Total Count") +
   labs (fill = "Survived")
 # looks like that the larger the family in terms of Parent and Children, the worse
-
 
 titanic_train %>%
   ggplot(aes(x = as.factor(FamilySize), fill = factor(Survived))) +
@@ -310,7 +347,6 @@ titanic_train %>%
 # it does not look like that the Fare does have lots of prective value
 
 
-
 ################################################################################
 # CABIN
 
@@ -340,8 +376,8 @@ titanic_train %>%
 # E-U look like third Class
 # Note: Pclass is already very predictive of the Survival
 
-
-
+################################################################################
+# EMBARKED
 # Survival Rates per Port of Embarkation 
 titanic_train %>%
   ggplot(aes(x = as.factor(Embarked), fill = factor(Survived))) +
@@ -351,91 +387,153 @@ titanic_train %>%
   ylab ("Total Count") +
   labs (fill = "Survived")
 
-
 ################################################################################
+# RANDOM FOREST TRAINING
 ################################################################################
-# Function to extract Titles from Names
+# 01
+# just with PClass and Title
 
-extract_Title <- function (name) {
-  name <- as.character(name)
-  
-  if (length (grep ("Miss.", name)) > 0 ) {
-    return ("Miss.")
-  } else if (length (grep ("Master.", name)) > 0 ) {
-    return ("Master.")
-  } else if (length (grep ("Mrs.", name)) > 0 ) {
-    return ("Mrs.")
-  } else if (length (grep ("Miss.", name)) > 0 ) {
-      return ("Miss.")
-  } else if (length (grep ("Mlle.", name)) > 0 ) {
-    return ("Miss.")
-  } else if (length (grep ("Mme.", name)) > 0 ) {
-    return ("Mrs.")
-  } else if (length (grep ("Ms.", name)) > 0 ) {
-    return ("Mrs.")
-  } else if (length (grep ("Mr.", name)) > 0 ) {
-    return ("Mr.")
-  } else if (length (grep ("Dr.", name)) > 0 ) {
-    return ("Dr.")
-  } else if (length (grep ("Rev.", name)) > 0 ) {
-    return ("Priest.")
-  } else if (length (grep ("Don.", name)) > 0 ) {
-    return ("Priest.")
-  } else if (length (grep ("Dona.", name)) > 0 ) {
-    return ("Mrs.")
-  }  else if (length (grep ("Col.", name)) > 0 ) {
-    return ("Military.")
-  } else if (length (grep ("Capt.", name)) > 0 ) {
-    return ("Military.")
-  } else if (length (grep ("Major.", name)) > 0 ) {
-    return ("Military.")
-  } else return ("Other.")
-  
-}
+rf.train.01 <- titanic_train[, c("Pclass", "Title")]
+rf.label <- as.factor (titanic_train$Survived)
 
-################################################################################
-# Section - combination of the two datasets for mutual cleaning
+set.seed (1234)
+rf.01 <- randomForest (x = rf.train.01, y = rf.label, importance = TRUE, ntree = 1000)
+rf.01
+varImpPlot(rf.01)
 
-# we will combine the two datasets to clean them together, in order to keep track which entry is which (training or test set) we add a column to store if a row was originally coming from the training or the test set
-titanic_train$IsTrainingSet <- TRUE
-titanic_test$IsTrainingSet <- FALSE
+##
+# OOB:
+# I will do a 1000 times and randomly select a bunch of rows and columns each time (sampling with replacement), some rows and column will never be selected, those will be left out will be used to test the accuracy of the model
+# On average I trained 1000 trees and we are getting a (1 - 20.88%) Accuracy
+# Confusion Matrix:
+# True Value vs Predicted Values
+# 534 were predicted to Die (and they died) - OK
+# 15 were predicted to Die (and they lived) - ERROR
+# 171 were predicted to Live (and they died) - ERROR
+# 171 were predicted to Live (and they lived) - OK
 
-# in order to combine the datasets we need to make sure that the structure (names and number cols of the header must match)
-ncol(titanic_train) # 13 columns
-ncol(titanic_test) # 12 columns
+# Comment:
+# when people perish , the model is 98% correct (1- 0.027)
+# when poeple live, it is more of a 50:50
+# it makes sens as the distribution of the people is skewed as more are dead
+table (rf.label)
 
-# so let's check how the headers of each of the datasets are called
-names (titanic_train)
-names (titanic_test) # Survived is missing in the test dataset...
-titanic_test$Survived <- NA # ... and we add it so we can then bind it to the training set
-
-# we are about to merge / bind the two data sets, let's just see how many rows there are
-nrow(titanic_train) # 891
-nrow(titanic_test) # 418
-
-titanic_full <- rbind (titanic_train, titanic_test) # SQL union - a vertical Join of the two data sets
-nrow(titanic_full) # 1309 --- 891 + 418 - 1309 # 0 so the math checks out
-
-table (titanic_full$IsTrainingSet) # let's check if the combination went well
+# the far right the dot is in the next chart, the more important.
+varImpPlot(rf.01)
+# so Title is very much a predictive feature!
 
 
 ################################################################################
+# 02
+# with PClass and Title and SibSp
+
+rf.train.02 <- titanic_train[, c("Pclass", "Title", "SibSp")]
+rf.label <- as.factor (titanic_train$Survived)
+
+set.seed (1234)
+rf.02 <- randomForest (x = rf.train.02, y = rf.label, importance = TRUE, ntree = 1000)
+rf.02
+varImpPlot(rf.02)
+
+# Error Rate is decreased by
+(0.2088 - 0.1908)*100
+
+# we reduced our error rate in predicting the living
+(0.0273224 - 0.1056466)*100
+# at the cost of increasing our error rate in predicting the dead
+(0.5000000 - 0.3274854)*100
+# Attention that in any application error type 1 and 2 have a different imporance, for example telling somebody that is sick while he is not or that is fine while he is sick
+
+
 ################################################################################
-# ADDING NEW FEATURES
+# 03
+# with PClass and Title and Parch
 
-# TITLES
-titles <- NULL
-for (i in 1:nrow (titanic_full)) {
-  titles <- c (titles, extract_Title(titanic_full[i,"Name"])) 
-}
-titanic_full$Title <- as.factor (titles) 
-tail(titanic_full)
+rf.train.03 <- titanic_train[, c("Pclass", "Title", "Parch")]
+rf.label <- as.factor (titanic_train$Survived)
 
-# FAMILY SIZE
-titanic_full$FamilySize <- as.numeric(titanic_full$SibSp) + as.numeric(titanic_full$Parch) + 1
-tail(titanic_full)
+set.seed (1234)
+rf.03 <- randomForest (x = rf.train.03, y = rf.label, importance = TRUE, ntree = 1000)
+rf.03
+varImpPlot(rf.03)
+
+# small improvement from the 01 model, Parch looks like less predictive than SibSp
 
 
+################################################################################
+# 04
+# with PClass and Title plus combination of SibSp and Parch
+
+rf.train.04 <- titanic_train[, c("Pclass", "Title", "SibSp", "Parch")]
+rf.label <- as.factor (titanic_train$Survived)
+
+set.seed (1234)
+rf.04 <- randomForest (x = rf.train.04, y = rf.label, importance = TRUE, ntree = 1000)
+rf.01
+rf.04
+varImpPlot(rf.04)
+
+# Error rate decreased from 20.88% to 18.41%
+
+
+################################################################################
+# 05
+# with PClass and Title plus the Family Size
+
+rf.train.05 <- titanic_train[, c("Pclass", "Title", "FamilySize")]
+# warning I had to switch the FamilySize from numeric to factor
+rf.label <- as.factor (titanic_train$Survived)
+
+set.seed (1234)
+rf.05 <- randomForest (x = rf.train.05, y = rf.label, importance = TRUE, ntree = 1000)
+rf.01
+rf.05
+varImpPlot(rf.05)
+# OOB estimate gets us the lowest error rate 17.96%
+# FamilySize matters!
+
+
+################################################################################
+# 06
+# with PClass, Title plus the Family Size and SibSp
+
+rf.train.06 <- titanic_train[, c("Pclass", "Title", "SibSp","FamilySize")]
+rf.label <- as.factor (titanic_train$Survived)
+
+set.seed (1234)
+rf.06 <- randomForest (x = rf.train.06, y = rf.label, importance = TRUE, ntree = 1000)
+rf.01
+rf.06
+varImpPlot(rf.06)
+# adding SibSp to FamilySize the situation get worse
+
+################################################################################
+# 07
+# with PClass, Title plus the Family Size and Parch
+
+rf.train.07 <- titanic_train[, c("Pclass", "Title", "Parch","FamilySize")]
+rf.label <- as.factor (titanic_train$Survived)
+
+set.seed (1234)
+rf.07 <- randomForest (x = rf.train.07, y = rf.label, importance = TRUE, ntree = 1000)
+rf.06
+rf.07
+varImpPlot(rf.07)
+# adding Parch to FamilySize the situation get worse from SibSp
+
+
+################################################################################
+# WRAP UP
+rf.05
+
+
+
+
+
+
+
+################################################################################
+# Here the approach from Data Science Dojo and David Langer differs
 ################################################################################
 # Cleaning the Missing Values
 table (titanic_full$Pclass) # Pclass is all compiled
@@ -595,3 +693,60 @@ output.df$Survived <- Survived
 
 # Saving the results into csv file to be updated in Kaggle - remember to version it
 write.csv (output.df, "Data/Kaggle_Submission_V15.csv", row.names = FALSE)
+
+
+
+################################################################################
+################################################################################
+################################################################################
+# BACKUP
+
+# ################################################################################
+# # Research in names of Miss. Mr. Mrs. Master and other Titles
+# # This whole section is DEPRECATED deprecated as we will use a FUNCTION to do this
+# 
+# titanic_train$Title <- NA
+# 
+# # Miss.
+# misses <- which (str_detect(titanic_train$Name, "Miss."))
+# titanic_train[misses,]$Title <- "Miss."
+# 
+# # Mr. Misters before Mrs otherwise it will overwrite the Mrs !!!
+# mr <- which (str_detect(titanic_train$Name, "Mr."))
+# titanic_train[mr,]$Title <- "Mr."
+# 
+# # Mrs.
+# mrs <- which (str_detect(titanic_train$Name, "Mrs."))
+# titanic_train[mrs,]$Title <- "Mrs."
+# 
+# # Master.
+# masters <- which (str_detect(titanic_train$Name, "Master."))
+# titanic_train[masters,]$Title <- "Master."
+# 
+# # Rev.
+# rev <- which (str_detect(titanic_train$Name, "Rev."))
+# titanic_train[rev,]$Title <- "Rev."
+# 
+# # Dr.
+# dr <- which (str_detect(titanic_train$Name, "Dr."))
+# titanic_train[dr,]$Title <- "Dr."
+# 
+# # Dme. to Mrs.
+# mme <- which (str_detect(titanic_train$Name, "Mme."))
+# titanic_train[mme,]$Title <- "Mrs."
+# 
+# # Ms. to Mrs.
+# ms <- which (str_detect(titanic_train$Name, "Ms."))
+# titanic_train[ms,]$Title <- "Mrs."
+# 
+# # Mlle. to Mrs.
+# mlle <- which (str_detect(titanic_train$Name, "Mlle."))
+# titanic_train[mlle,]$Title <- "Mrs."
+# 
+# # all Others to Others
+# others <- which (is.na(titanic_train$Title))
+# titanic_train[others,]$Title <- "Other."
+# 
+# 
+# ################################################################################
+
