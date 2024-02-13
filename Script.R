@@ -126,32 +126,36 @@ extract_Title <- function (name) {
     return ("Miss.")
   } else if (length (grep ("Master.", name)) > 0 ) {
     return ("Master.")
-  } else if (length (grep ("Mrs.", name)) > 0 ) {
-    return ("Mrs.")
-  } else if (length (grep ("Miss.", name)) > 0 ) {
-    return ("Miss.")
   } else if (length (grep ("Mlle.", name)) > 0 ) {
     return ("Miss.")
+  } else if (length (grep ("Miss.", name)) > 0 ) {
+    return ("Miss.")
+  } else if (length (grep ("Mrs.", name)) > 0 ) {
+    return ("Mrs.")
   } else if (length (grep ("Mme.", name)) > 0 ) {
     return ("Mrs.")
   } else if (length (grep ("Ms.", name)) > 0 ) {
-    return ("Mrs.")
+    return ("Miss.")
   } else if (length (grep ("Mr.", name)) > 0 ) {
     return ("Mr.")
   } else if (length (grep ("Dr.", name)) > 0 ) {
     return ("Dr.")
   } else if (length (grep ("Rev.", name)) > 0 ) {
     return ("Priest.")
-  } else if (length (grep ("Don.", name)) > 0 ) {
-    return ("Priest.")
   } else if (length (grep ("Dona.", name)) > 0 ) {
-    return ("Mrs.")
-  }  else if (length (grep ("Col.", name)) > 0 ) {
+    return ("Lady.")
+  } else if (length (grep ("Don.", name)) > 0 ) {
+    return ("Sir.")
+  } else if (length (grep ("Countess.", name)) > 0 ) {
+    return ("Lady.")
+  } else if (length (grep ("Col.", name)) > 0 ) {
     return ("Military.")
   } else if (length (grep ("Capt.", name)) > 0 ) {
     return ("Military.")
   } else if (length (grep ("Major.", name)) > 0 ) {
     return ("Military.")
+  } else if (length (grep ("Jonkheer.", name)) > 0 ) {
+    return ("Sir.") 
   } else return ("Other.")
 }
 ################################################################################
@@ -461,12 +465,14 @@ varImpPlot(rf.04)
 ################################################################################
 # 05
 # with PClass and Title plus the Family Size
+# this is the BEST MODEL we created
 
 rf.train.05 <- titanic_full[1:891, c("Pclass", "Title", "FamilySize")]
 # remember to use FamilySize as Factor
 
 str(rf.train.05)
 rf.label <- as.factor (titanic_full[1:891,]$Survived)
+summary(rf.train.05)
 
 set.seed (1234)
 rf.05 <- randomForest (x = rf.train.05, y = rf.label, importance = TRUE, ntree = 1000)
@@ -517,7 +523,6 @@ rf.05 # is the best model so far in terms of accuracy
 # Cross Validation is a way to do things: 1) maximise the value of the (limited) training data and 2) improve the performance of the prediction with unseen data
 # Random Forrest is cool because it gives you the estimate of the error rate
 
-
 # Make subset of Test Dataset to match with the requirements of rf.05
 titanic_test_sub <- titanic_full[892:1309, c("Pclass", "Title", "FamilySize")]
 
@@ -547,8 +552,11 @@ rf.05
 # All 10 chunks are reiterated and used as test set.
 # This means that if we use 1000 trees in a RF model, we will train 100.000 trees.
 
-set.seed (2348)
 
+################################################################################
+# Cross Validation 10-fold - 10-times 
+
+set.seed (2348)
 # createMultiFolds returns you a number of indexes
 ?createMultiFolds
 # Stratification: in Titanic more people died then Survived so we make sure that, as chunks gets smaller, no chunk takes more died people than the reality
@@ -578,6 +586,212 @@ ctrl.1 <- trainControl(method = "repeatedcv", number = 10, repeats = 10, index =
 
 ?makeCluster
 cl <- makeCluster(4, type = "SOCK") # 4 child processes with Socket Server 
+registerDoSNOW(cl) # register the cluster so Caret understands that will have to use it
+
+set.seed (34324)
+?train
+
+rf.05.cv.1 <-  train(x = rf.train.05, y = rf.label, method = "rf", tuneLength = 3, ntree = 1000, trControl = ctrl.1)
+# train: a single training function for a huge number of methods
+# tuneLenght: tries a number a hyper parameters (such as the number of trees that we set up to 1000, or "mtry"), caret will find which is the best value (3 times)
+# attention, that now we will train 1000 trees, times 10 CV repeated 10 times times the 3 attempt for the hyperparameters, so 300k trees
+# method: rf = use the random forest
+# trControl: the orchestration, the brain, 10 fold CV repeated 10 times, with stratification
+
+stopCluster(cl)
+
+rf.05.cv.1
+# best accuracy is 81.07% which is still higher than the score we got (using all new data) on Kaggle, so maybe using 90% of the data to train our model
+# stil tends to over fit
+
+
+################################################################################
+# Cross Validation 5-fold - 10-times 
+set.seed (5983)
+
+cv.05.folds <- createMultiFolds(rf.label, k = 5, times = 10)
+ctrl.2 <- trainControl(method = "repeatedcv", number = 5, repeats = 10, index = cv.05.folds)
+
+cl <- makeCluster(8, type = "SOCK") # 8 child processes with Socket Server 
+registerDoSNOW(cl) # register the cluster so Caret understands that will have to use it
+
+set.seed (5983)
+rf.05.cv.2 <- train(x = rf.train.05, y = rf.label, method = "rf", tuneLength = 2, ntree = 1000, trControl = ctrl.2)
+
+stopCluster(cl)
+
+rf.05.cv.1 # cv 10-fold 10-times 
+rf.05.cv.2 # cv 05-fold 10-times
+
+
+
+################################################################################
+# Cross Validation 3-fold - 10-times 
+set.seed (37956)
+
+cv.03.folds <- createMultiFolds(rf.label, k = 3, times = 10)
+ctrl.3 <- trainControl(method = "repeatedcv", number = 3, repeats = 10, index = cv.03.folds)
+
+cl <- makeCluster(4, type = "SOCK") # 4 child processes with Socket Server 
+registerDoSNOW(cl) # register the cluster so Caret understands that will have to use it
+
+set.seed (94622)
+rf.05.cv.3 <- train(x = rf.train.05, y = rf.label, method = "rf", tuneLength = 2, ntree = 1000, trControl = ctrl.3)
+
+stopCluster(cl)
+
+rf.05.cv.1 # cv 10-fold 10-times 
+rf.05.cv.2 # cv 05-fold 10-times
+rf.05.cv.3 # cv 03-fold 10-times
+
+
+predict.train()
+?predict.train
+
+################################################################################
+# WRAP UP
+rf.05.cv.3 # cv 03-fold 10-times
+# we have determined that the 3-fold cross validation model as it is the more accurate with data that it did not see
+
+
+
+################################################################################
+# Advanced Exploratory Modelling 
+################################################################################
+
+# in order to use an easier model to understand we will use a single decision tree, clearly RM forests are better but more complex to learn
+
+# Install Packages
+#install.packages(c("rpart", "rpart.plot"))
+library (rpart)
+library (rpart.plot)
+
+
+# Creation of a utility function
+rpart.cv <- function (seed, training, labels, ctrl) {
+  # open CPU cluster
+  cl <- makeCluster(4, type = "SOCK")
+  registerDoSNOW(cl)
+  
+  set.seed (seed)
+  # Leverage formula interface for training
+  rpart.cv <- train (x = training, y = labels, method = "rpart", tuneLength = 30, trControl = ctrl)
+  
+  # shutdown cluster
+  stopCluster(cl)
+  
+  return (rpart.cv)
+}
+  
+# Grab the features we need for the model
+features <- c ("Pclass", "Title", "FamilySize")
+rpart.train.01 <- titanic_full[1:891, features]
+
+# run CV and check results
+rpart.01.cv.01 <- rpart.cv (94622, rpart.train.01, rf.label, ctrl.3)
+rpart.01.cv.01
+
+# plot the rpart model
+rpart.plot(rpart.01.cv.01$finalModel)
+prp(rpart.01.cv.01$finalModel, type = 0, extra = 1, under = TRUE)
+?prp
+
+
+# Let's read the plots
+#   A. If your TITLE is Dr. Military. Mr. Priest (== YES) then you died
+#   B. If you are NOT in the PCLASS = 3 then you Lived (1)
+#   C. If you are in the PCLASS = 1 or 2 then the model checks the size of the Family
+#   D. If it is 5,6,8,11 then you Die (0), otherwise you live (1)
+
+#   C and D looks like a overfittig
+
+
+# As the Title is so important for the model, nut basically makes die all the Misters (and other) it is important to look it further
+table(titanic_full$Title)
+
+# Parse out last name and title
+titanic_full[1:25,"Name"] #
+
+# LAST NAMES
+name.splits <- str_split(titanic_full$Name, ",")
+name.splits[1]
+last.names <- sapply(name.split, "[", 1)
+last.names[1:10]
+
+titanic_full$LastName <- last.names
+
+
+# TITLES
+name.splits <- str_split(sapply(name.splits, "[", 2), " ")
+titles <- sapply(name.splits, "[", 2)
+unique (titles)
+
+table (titanic_full$Title)
+
+titanic_full$Title <- as.factor (titanic_full$Title)
+
+titanic_full[1:891,] %>%
+  ggplot (aes (x = Title, fill = as.factor(Survived))) +
+  geom_bar(stat = "count") +
+  facet_wrap (~ Pclass) +
+  ggtitle ("Survival Rate by Title and PClass")
+
+# let's try to reduce the (potential) overfitting of the model by reducing the number of titles:
+#   A. Sirs can go back with Misters.
+#   B. Lady can go with Mrs.
+#   C. Dr. can go with Mr. (we assume that are all males medical doctors)
+#   D. Officers can also go with Mr. (all adult males)
+
+indexes <- which (titanic_full$Title == "Lady.")
+titanic_full[indexes,]$Title <- "Mrs."
+
+indexes <- which (titanic_full$Title == "Military." |
+                  titanic_full$Title == "Dr." |  
+                  titanic_full$Title == "Rev." |
+                  titanic_full$Title == "Priest." |
+                  titanic_full$Title == "Sir.")
+titanic_full[indexes,]$Title <- "Mr."
+
+# here we have the "tuned" Title
+table (titanic_full$Title)
+
+titanic_full$Title <- as.factor(as.character(titanic_full$Title))
+
+titanic_full[1:891,] %>%
+  ggplot (aes (x = Title, fill = as.factor(Survived))) +
+  geom_bar(stat = "count") +
+  facet_wrap (~ Pclass) +
+  ggtitle ("Survival Rate by Title and PClass")
+
+
+################################################################################
+# we can now run again the model with the improved Title
+
+# Grab the features we need for the model
+features <- c ("Pclass", "Title", "FamilySize")
+rpart.train.02 <- titanic_full[1:891, features]
+
+# run CV and check results
+rpart.02.cv.01 <- rpart.cv (94622, rpart.train.02, rf.label, ctrl.3)
+rpart.02.cv.01
+
+# plot the rpart model
+rpart.plot(rpart.02.cv.01$finalModel)
+prp(rpart.02.cv.01$finalModel, type = 0, extra = 1, under = TRUE)
+
+
+# Let's dive in the first class Mrs.
+titanic_full$Pclass <- as.factor(titanic_full$Pclass)
+titanic_full$Sex <- as.factor(titanic_full$Sex)
+
+indexes <- which (titanic_full$Title == "Mr." & titanic_full$Pclass == 1)
+firstclass.mr <- titanic_full[indexes,]
+summary (firstclass.mr)
+
+# one female in Mr?
+which (firstclass.mr$Sex == "female")
+# let's fix it - it was a bad assumption to say that all Dr. were males
+firstclass.mr[which (firstclass.mr$Sex == "female"),]$Sex <- "male"
 
 
 
