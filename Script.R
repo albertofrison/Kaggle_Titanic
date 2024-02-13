@@ -23,7 +23,6 @@
 
 
 
-
 ################################################################################
 # install.packages('randomForest')
 # install.packages ('tidyverse')
@@ -157,8 +156,6 @@ extract_Title <- function (name) {
 }
 ################################################################################
 
-
-# TITANIC FULL
 # TITLES
 titles <- NULL
 for (i in 1:nrow (titanic_full)) {
@@ -532,7 +529,6 @@ output.df <- data.frame(PassengerId = rep(892:1309), Survived = rf.05.prediction
 
 # Store into a csv for saving and upload into Kaggle (remeber to version it)
 write.csv (output.df, "Data/Kaggle_Submission_V16.csv", row.names = FALSE)
-
 # ==> Submit to Kagle https://www.kaggle.com/competitions/titanic/submissions
 
 
@@ -546,11 +542,42 @@ rf.05
 # entering CARET
 ################################################################################
 
+# Research has shown that 10-fold CV repeated 10 times is the best place to start,
+# The data set is split in 10 chunks, 9 are used to train the model, and 1 is used to validate.
+# All 10 chunks are reiterated and used as test set.
+# This means that if we use 1000 trees in a RF model, we will train 100.000 trees.
+
+set.seed (2348)
+
+# createMultiFolds returns you a number of indexes
+?createMultiFolds
+# Stratification: in Titanic more people died then Survived so we make sure that, as chunks gets smaller, no chunk takes more died people than the reality
+cv.10.folds <- createMultiFolds(rf.label, k = 10, times = 10)
+
+# let's check if the stratification worked
+table(rf.label)
+342/549 # 62 people out of 100 died
+
+table (rf.label[cv.10.folds[[74]]])
+308/494 # same here
+table (rf.label[cv.10.folds[[100]]])
+308/494 # we are stratified, Caret works
 
 
+# trainControl 
+?trainControl
+ctrl.1 <- trainControl(method = "repeatedcv", number = 10, repeats = 10, index = cv.10.folds)
+# method =  repeated cross validation
+# number = number of folds (10) - which is also the default
+# repeats = for repeted cv validation, the number of complete sets folds to compute
+# index = the indexes used for the reiterations
 
+# multi-core training
+# Use doSNOW package to set up child process subordinated to the main thread here in R and use socket to connect to them
+# it does stress out the CPU
 
-
+?makeCluster
+cl <- makeCluster(4, type = "SOCK") # 4 child processes with Socket Server 
 
 
 
