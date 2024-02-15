@@ -645,9 +645,6 @@ rf.05.cv.2 # cv 05-fold 10-times
 rf.05.cv.3 # cv 03-fold 10-times
 
 
-predict.train()
-?predict.train
-
 ################################################################################
 # WRAP UP
 rf.05.cv.3 # cv 03-fold 10-times
@@ -795,7 +792,8 @@ which (firstclass.mr$Sex == "female")
 # let's fix it - it was a bad assumption to say that all Dr. were males
 firstclass.mr[which (firstclass.mr$Sex == "female"),]$Sex <- "male"
 
-
+titanic_full[which (titanic_full$Sex == "female" & titanic_full$Title == "Mr."),]$Title <- "Mrs."
+ 
 
 ################################################################################
 # let's look also at the Fares for the Mr. in first class
@@ -946,8 +944,54 @@ prp(rpart.03.cv.01$finalModel, type = 0, extra = 1, under = TRUE)
 
 
 
+################################################################################
+# So now we retrain a new RF, with the new features with CV
+
+set.seed (37956)
+cv.03.folds <- createMultiFolds(rf.label, k = 3, times = 10)
+ctrl.03 <- trainControl(method = "repeatedcv", number = 3, repeats = 10, index = cv.03.folds)
 
 
+str(titanic_full)
+
+titanic_full$Pclass <- as.factor(titanic_full$Pclass)
+table (titanic_full$Title)
+
+titanic_full$Title <- as.factor(as.character(titanic_full$Title))
+table (titanic_full$Title)
+
+titanic_full$ticket.party.size <- as.factor(as.numeric(titanic_full$ticket.party.size))
+table (titanic_full$ticket.party.size)
+
+
+rf.train.09 <- titanic_full[1:891, c("Title", "Pclass", "ticket.party.size", "avg.fare")]
+
+# set seed, start cluster, register cluster, start training, stop cluster
+set.seed (94622)
+cl <- makeCluster(4, type = "SOCK") # 4 child processes with Socket Server 
+registerDoSNOW(cl) # register the cluster so Caret understands that will have to use it
+rf.09.cv.03 <- train(x = rf.train.09, y = rf.label, method = "rf", tuneLength = 2, ntree = 1000, trControl = ctrl.03)
+stopCluster(cl)
+
+rf.09.cv.03
+
+
+# Make a Prediction
+# Make subset of Test Dataset to match with the requirements of rf.08.cv.3
+titanic_test_sub <- titanic_full[892:1309, c("Title", "Pclass", "ticket.party.size", "avg.fare")]
+
+rf.09.prediction <- predict(rf.09.cv.03, titanic_test_sub)
+table (rf.09.prediction)
+
+# Store into a df
+output.df <- data.frame(PassengerId = rep(892:1309), Survived = rf.09.prediction)
+
+# Store into a csv for saving and upload into Kaggle (remeber to version it)
+write.csv (output.df, "Data/Kaggle_Submission_V20.csv", row.names = FALSE)
+# ==> Submit to Kaggle https://www.kaggle.com/competitions/titanic/submissions
+# scored  
+
+view(titanic_full)
 
 
 
