@@ -780,6 +780,8 @@ rpart.plot(rpart.02.cv.01$finalModel)
 prp(rpart.02.cv.01$finalModel, type = 0, extra = 1, under = TRUE)
 
 
+################################################################################
+# it looks like that if you are a Mr. you die. isn't it possible that there is more to it?
 # Let's dive in the first class Mrs.
 titanic_full$Pclass <- as.factor(titanic_full$Pclass)
 titanic_full$Sex <- as.factor(titanic_full$Sex)
@@ -792,6 +794,119 @@ summary (firstclass.mr)
 which (firstclass.mr$Sex == "female")
 # let's fix it - it was a bad assumption to say that all Dr. were males
 firstclass.mr[which (firstclass.mr$Sex == "female"),]$Sex <- "male"
+
+
+
+################################################################################
+# let's look also at the Fares for the Mr. in first class
+indexes.first.mr <- which(titanic_full$Pclass == "1" & titanic_full$Title == "Mr.")
+first.mr.df <- titanic_full[indexes.first.mr,]
+
+# for some reason Survived is a number
+
+titanic_full$Survived <- as.factor(titanic_full$Survived)
+first.mr.df$Survived <- as.factor(first.mr.df$Survived)
+
+# let's look at the survival rates of these people
+summary (as.factor(first.mr.df[first.mr.df$Survived == "1",]$Survived))
+view(first.mr.df[first.mr.df$Survived == "1",])
+
+# let's look at the some of the higher tickets
+indexes <- which (titanic_full$Ticket == "PC 17755"|
+                  titanic_full$Ticket == "PC 17611"|
+                  titanic_full$Ticket == "113760"
+                ) 
+view(titanic_full[indexes,])
+
+# visualize the survival rate by Fare
+titanic_full[1:891,] %>%
+  filter (Pclass == "1") %>%
+    filter (Title == "Mr.") %>%
+      ggplot (aes (x = Fare, fill = Survived, color = Survived)) +
+      geom_density(alpha = 0.3) +
+      ggtitle ("First Class Mr. - Survival rates by Fare")
+
+# let's try to see if the Average Fare is predictive of the Survival Rate
+
+#initializes the arrays for the number of people in the party with the same ticket, the average fare
+ticket.party.size <- rep(0, nrow(titanic_full))
+avg.fare <- rep (0.0, nrow(titanic_full))
+
+# get all the unique tickets and get the number
+tickets <- unique (titanic_full$Ticket)
+length (tickets)
+
+# loop for each unique ticket,
+for (i in 1:length (tickets)) {
+  # grab me the i-nth value of the ticket
+  current.ticket <- tickets[i]
+  
+  # get me all the people with the i-nth ticket (get the indexes)
+  party.indexes <- which (titanic_full$Ticket == current.ticket)
+  
+  #grab be the first index from the party indexes vector and get the Fare , then divide it by the number of people in the party
+  current.avg.fare <- titanic_full[party.indexes[1], "Fare"] / length (party.indexes)
+
+  
+  # updates all the people partaking to the same ticket number
+  for (k in 1: length(party.indexes)) {
+    ticket.party.size[party.indexes[k]] <- length((party.indexes))
+    avg.fare[party.indexes[k]] <- current.avg.fare
+  }
+}
+
+# Add the new features into the main df.
+titanic_full$ticket.party.size <- ticket.party.size 
+titanic_full$avg.fare <- avg.fare
+
+# Query the updated titanic_full
+titanic_full %>%
+  filter (Pclass == "1") %>%
+  filter (Title == "Mr.") %>%
+  summary()
+
+
+
+# visualize the survival rate by Party Size
+titanic_full[1:891,] %>%
+  filter (Pclass == "1") %>%
+  filter (Title == "Mr.") %>%
+    ggplot (aes (x = ticket.party.size, fill = Survived, color = Survived)) +
+    geom_density(alpha = 0.3) +
+    ggtitle ("First Class Mr. - Survival rates by Ticket Party Size")
+
+
+
+# visualize the survival rate by Fare
+titanic_full[1:891,] %>%
+  filter (Pclass == "1") %>%
+  filter (Title == "Mr.") %>%
+    ggplot (aes (x = avg.fare, fill = Survived, color = Survived)) +
+    geom_density(alpha = 0.3) +
+    ggtitle ("First Class Mr. - Survival rates by Fare")
+    
+################################################################################
+# Hypothesis - ticket party size is correlated with average fare
+summary (titanic_full$avg.fare)
+  
+#fix the one NA
+titanic_full[is.na(titanic_full$avg.fare),]$avg.fare
+
+# how to fix the missing value for avg.fare? let's find the other people that look like him
+titanic_full %>%
+  filter (Pclass == 3) %>%
+    filter (Title == "Mr.") %>%
+      filter (Ticket != "3701") %>%
+        select (avg.fare) %>%
+          summary ()
+
+# input in the median 
+titanic_full[is.na(titanic_full$avg.fare),]$avg.fare <- 7.796 
+  
+
+# so now we can use CARET to reprocess the two new data and see if those are correlated
+preproc_titanic_full <- titanic_full[, c("ticket.party.size", "avg.fare")]
+
 
 
 
