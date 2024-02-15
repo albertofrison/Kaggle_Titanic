@@ -907,6 +907,45 @@ titanic_full[is.na(titanic_full$avg.fare),]$avg.fare <- 7.796
 # so now we can use CARET to reprocess the two new data and see if those are correlated
 preproc_titanic_full <- titanic_full[, c("ticket.party.size", "avg.fare")]
 
+# caret preProcess standardizes the data in order to compute later a correlation calculation
+?preProcess 
+preProc <-  preProcess (preproc_titanic_full, method = c("center", "scale"))
+
+postproc_titanic_full <- predict (preProc, preproc_titanic_full)
+
+#so now compare the two list of pre processed and post processed "ticket party size" and "average fare"
+view (preproc_titanic_full) # non standardized
+view (postproc_titanic_full) # centered and scaled
+
+# It looks like that all this hazzle about preprocessing and post processing was not really useful
+cor (preproc_titanic_full$ticket.party.size, preproc_titanic_full$avg.fare)
+cor (postproc_titanic_full$ticket.party.size, postproc_titanic_full$avg.fare)
+# 0.094 is not a great correlation which is good, because this might hide additional information
+
+
+# OK - so let' see if the new two features are now predictive or not
+str(titanic_full)
+features <- c ("Pclass", "Title", "FamilySize", "ticket.party.size", "avg.fare")
+rpart.train.03 <- titanic_full[1:891, features]
+
+# Small comment of single decision tree vs RF 
+# Single decision trees execute STRONG features selections, in respect to RF which can use all features
+
+str(rpart.train.03)
+rpart.03.cv.01 <- rpart.cv (94622, rpart.train.03, rf.label, ctrl.3)
+rpart.03.cv.01
+# note that the optimal tuning parameter used is different from before
+
+
+# plot the rpart model
+rpart.plot(rpart.03.cv.01$finalModel)
+prp(rpart.03.cv.01$finalModel, type = 0, extra = 1, under = TRUE)
+
+# now the plot has eliminated the Family Size Feature, it is no longer there we have now
+# theoretically a more generalized model, less overfitting, and more prone to better decide on data that has been not seen
+
+
+
 
 
 
